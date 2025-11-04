@@ -89,14 +89,6 @@ const Influencers: React.FC = () => {
     useEffect(() => {
         dispatch(getCreators(itemsPerPage, currentPage, () => setIsLoading(false)) as unknown as any);
     }, [dispatch, itemsPerPage, currentPage]);
-
-    // if (isLoading) {
-    //     return (
-    //       <div className="flex items-center justify-center h-screen bg-dark-900">
-    //         <div className="w-16 h-16 border-4 border-dashed rounded-full animate-spin border-primary"></div>
-    //       </div>
-    //     );
-    // }
     
     useEffect(() => {
         setCurrentPage(1);
@@ -104,7 +96,6 @@ const Influencers: React.FC = () => {
 
     // const totalPages = Math.ceil(filteredInfluencers.length / itemsPerPage);
     const totalPages = Math.ceil(creators?.pagination?.total_count / itemsPerPage);
-    // console.log(creators?.pagination?.total_count, '=====> totalPages');
 
     const paginatedInfluencers = useMemo(() => {
         const startIndex = (currentPage - 1) * itemsPerPage;
@@ -142,6 +133,14 @@ const Influencers: React.FC = () => {
     
     if (selectedInfluencer) {
         return <InfluencerDetail influencer={selectedInfluencer} onBack={() => setSelectedInfluencer(null)} />;
+    }
+
+    if (isLoading) {
+        return (
+          <div className="flex items-center justify-center h-screen bg-dark-900">
+            <div className="w-16 h-16 border-4 border-dashed rounded-full animate-spin border-primary"></div>
+          </div>
+        );
     }
 
   return (

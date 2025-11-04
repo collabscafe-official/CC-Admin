@@ -24,6 +24,24 @@ const BackIcon = () => (
     <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
 );
 
+const InstagramIcon = () => (
+  <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+      <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.85s-.011 3.584-.069 4.85c-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07s-3.584-.012-4.85-.07c-3.252-.148-4.771-1.691-4.919-4.919-.058-1.265-.069-1.645-.069-4.85s.011-3.584.069-4.85c.149-3.225 1.664-4.771 4.919-4.919 1.266-.058 1.644-.07 4.85-.07zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948s.014 3.667.072 4.947c.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072s3.667-.014 4.947-.072c4.358-.2 6.78-2.618 6.98-6.98.059-1.281.073-1.689.073-4.948s-.014-3.667-.072-4.947c-.2-4.358-2.618-6.78-6.98-6.98-1.281-.059-1.689-.073-4.948-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.162 6.162 6.162 6.162-2.759 6.162-6.162-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4s1.791-4 4-4 4 1.79 4 4-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44 1.441-.645 1.441-1.44-.645-1.44-1.441-1.44z"/>
+  </svg>
+);
+
+const TwitterIcon = () => (
+  <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+      <path d="M24 4.557c-.883.392-1.832.656-2.828.775 1.017-.609 1.798-1.574 2.165-2.724-.951.564-2.005.974-3.127 1.195-.897-.957-2.178-1.555-3.594-1.555-3.119 0-5.515 2.966-4.797 6.045-4.091-.205-7.719-2.165-10.148-5.144-1.29 2.213-.669 5.108 1.523 6.574-.806-.026-1.566-.247-2.229-.616v.064c0 2.298 1.634 4.212 3.793 4.649-.65.177-1.354.238-2.08.087.625 1.905 2.441 3.291 4.597 3.33-1.623 1.274-3.666 2.031-5.893 2.031-.383 0-.76-.022-1.13-.066 2.099 1.353 4.596 2.144 7.29 2.144 8.746 0 13.528-7.248 13.528-13.528 0-.206-.005-.412-.013-.617.929-.672 1.73-1.511 2.37-2.459z"/>
+  </svg>
+);
+
+const YouTubeIcon = () => (
+  <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+      <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+  </svg>
+);
+
 
 interface InfluencerDetailProps {
   influencer: Influencer;
@@ -34,7 +52,6 @@ const InfluencerDetail: React.FC<InfluencerDetailProps> = ({ influencer, onBack 
   const dispatch = useDispatch();
 
   const handleApproveCreator = (id: string) => {
-    console.log(id, '=====> id');
     dispatch(approveCreator(id) as any);
   };
   return (
@@ -61,9 +78,60 @@ const InfluencerDetail: React.FC<InfluencerDetailProps> = ({ influencer, onBack 
             <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
                 {influencer.name}
             </h3>
-            <div className="mt-2">
+            {/* <div className="mt-2">
                 <StatusBadge status={influencer.is_active ? 'Active' : 'Inactive'} />
+            </div> */}
+            {influencer.social_handles && influencer.social_handles.length > 0 && (
+            <div className="flex justify-center mt-4 space-x-4 text-gray-500 dark:text-gray-400">
+              {influencer.social_handles.map((socialHandle: any) => {
+                if (!socialHandle.is_active || socialHandle.is_deleted) return null;
+                
+                switch (socialHandle.platform?.toLowerCase()) {
+                  case 'instagram':
+                    return (
+                      <a 
+                        key={socialHandle._id}
+                        href={socialHandle.url} 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        className="flex flex-col items-center transition-colors hover:text-primary"
+                      >
+                        <InstagramIcon />
+                        <span className="text-xs mt-1">{socialHandle.follower_range}</span>
+                      </a>
+                    );
+                  case 'twitter':
+                    return (
+                      <a 
+                        key={socialHandle._id}
+                        href={socialHandle.url} 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        className="flex flex-col items-center transition-colors hover:text-primary"
+                      >
+                        <TwitterIcon />
+                        <span className="text-xs mt-1">{socialHandle.follower_range}</span>
+                      </a>
+                    );
+                  case 'youtube':
+                    return (
+                      <a 
+                        key={socialHandle._id}
+                        href={socialHandle.url} 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        className="flex flex-col items-center transition-colors hover:text-primary"
+                      >
+                        <YouTubeIcon />
+                        <span className="text-xs mt-1">{socialHandle.follower_range}</span>
+                      </a>
+                    );
+                  default:
+                    return null;
+                }
+              })}
             </div>
+          )}
         </div>
         
 

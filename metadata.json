@@ -1,0 +1,5 @@
+{
+  "name": "Collabscafe Admin Dashboard",
+  "description": "A modern, responsive admin dashboard for Collabscafe, built with React, TypeScript, and Tailwind CSS. It provides a clean user interface for managing application data.",
+  "requestFramePermissions": []
+}

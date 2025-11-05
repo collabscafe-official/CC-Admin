@@ -13,11 +13,12 @@ const AppIcon = () => (
 const LoginPage: React.FC<{ login: (email: string, password: string) => void }> = ({ login }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-
+  const [isLoading, setIsLoading] = useState(false);
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (email && password) {
-      login(email, password);
+      setIsLoading(true);
+      login(email, password, () => setIsLoading(false));
     }
   };
 
@@ -67,10 +68,11 @@ const LoginPage: React.FC<{ login: (email: string, password: string) => void }> 
 
           <div>
             <button
+              disabled={isLoading}
               type="submit"
               className="relative flex justify-center w-full px-4 py-3 text-sm font-medium text-white border border-transparent rounded-md bg-gradient-to-r from-primary to-primary-accent group hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all duration-300"
             >
-              Sign in
+              {isLoading ? <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div> : 'Sign in'}
             </button>
           </div>
         </form>

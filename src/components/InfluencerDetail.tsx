@@ -2,6 +2,9 @@ import React from 'react';
 import { Influencer } from '../types';
 import { useDispatch } from 'react-redux';
 import { approveCreator } from '../store/actions/creatorAction';
+import PackagesSection from './PackagesSection';
+import ContentHighlights from './ContentHighlights';
+import FaqsSection from './FaqsSection';
 
 const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
   const baseClasses = "px-2 py-1 text-xs font-medium rounded-full inline-block";
@@ -42,6 +45,18 @@ const YouTubeIcon = () => (
   </svg>
 );
 
+const XIcon = () => (
+  <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+      <path d="M18.901 1.153h3.68l-8.04 9.19L24 22.846h-7.406l-5.8-7.584-6.638 7.584H.474l8.6-9.83L0 1.154h7.594l5.243 6.932L18.901 1.153zm-1.613 19.59h2.546L4.109 2.507H1.513z"/>
+  </svg>
+);
+
+const TikTokIcon = () => (
+  <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+      <path d="M12.525.02c1.31-.02 2.61-.01 3.91.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.74-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/>
+  </svg>
+);
+
 
 interface InfluencerDetailProps {
   influencer: Influencer;
@@ -56,6 +71,7 @@ const InfluencerDetail: React.FC<InfluencerDetailProps> = ({ influencer, onBack 
   };
   return (
     <>
+    <div className="mb-10">
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-3xl font-semibold text-gray-700 dark:text-gray-200">
           Influencer Profile
@@ -70,30 +86,30 @@ const InfluencerDetail: React.FC<InfluencerDetailProps> = ({ influencer, onBack 
       </div>
       <div className="p-8 bg-white rounded-lg shadow-md dark:bg-dark-800">
         <div className="flex flex-col items-center text-center">
-            <img
-                className="object-cover w-24 h-24 mb-4 rounded-full ring-4 ring-primary"
-                src={influencer.profile_image || `https://eu.ui-avatars.com/api/?name=${influencer.name}&size=250&background=random`}
-                alt={`${influencer.name}'s profile`}
-            />
-            <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
-                {influencer.name}
-            </h3>
-            {/* <div className="mt-2">
+          <img
+            className="object-cover w-24 h-24 mb-4 rounded-full ring-4 ring-primary"
+            src={influencer.profile_image || `https://eu.ui-avatars.com/api/?name=${influencer.name}&size=250&background=random`}
+            alt={`${influencer.name}'s profile`}
+          />
+          <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
+            {influencer.name}
+          </h3>
+          {/* <div className="mt-2">
                 <StatusBadge status={influencer.is_active ? 'Active' : 'Inactive'} />
             </div> */}
-            {influencer.social_handles && influencer.social_handles.length > 0 && (
+          {influencer.social_handles && influencer.social_handles.length > 0 && (
             <div className="flex justify-center mt-4 space-x-4 text-gray-500 dark:text-gray-400">
               {influencer.social_handles.map((socialHandle: any) => {
                 if (!socialHandle.is_active || socialHandle.is_deleted) return null;
-                
+
                 switch (socialHandle.platform?.toLowerCase()) {
                   case 'instagram':
                     return (
-                      <a 
+                      <a
                         key={socialHandle._id}
-                        href={socialHandle.url} 
-                        target="_blank" 
-                        rel="noopener noreferrer" 
+                        href={socialHandle.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
                         className="flex flex-col items-center transition-colors hover:text-primary"
                       >
                         <InstagramIcon />
@@ -102,35 +118,53 @@ const InfluencerDetail: React.FC<InfluencerDetailProps> = ({ influencer, onBack 
                     );
                   case 'twitter':
                     return (
-                      <a 
+                      <a
                         key={socialHandle._id}
-                        href={socialHandle.url} 
-                        target="_blank" 
-                        rel="noopener noreferrer" 
+                        href={socialHandle.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
                         className="flex flex-col items-center transition-colors hover:text-primary"
                       >
-                        <TwitterIcon />
+                        <XIcon />
                         <span className="text-xs mt-1">{socialHandle.follower_range}</span>
                       </a>
                     );
                   case 'youtube':
                     return (
-                      <a 
+                      <a
                         key={socialHandle._id}
-                        href={socialHandle.url} 
-                        target="_blank" 
-                        rel="noopener noreferrer" 
+                        href={socialHandle.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
                         className="flex flex-col items-center transition-colors hover:text-primary"
                       >
                         <YouTubeIcon />
                         <span className="text-xs mt-1">{socialHandle.follower_range}</span>
                       </a>
                     );
+                    case 'tiktok':
+                      return (
+                        <a
+                          key={socialHandle._id}
+                          href={socialHandle.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex flex-col items-center transition-colors hover:text-primary"
+                        >
+                          <TikTokIcon />
+                          <span className="text-xs mt-1">{socialHandle.follower_range}</span>
+                        </a>
+                      );
                   default:
                     return null;
                 }
               })}
             </div>
+          )}
+          {influencer.profile_description && (
+            <p className="max-w-lg mx-auto mt-4 text-sm text-gray-600 dark:text-gray-400">
+              {influencer.profile_description}
+            </p>
           )}
         </div>
         
@@ -151,10 +185,10 @@ const InfluencerDetail: React.FC<InfluencerDetailProps> = ({ influencer, onBack 
                 </div>
                 <div>
                     <p className="font-semibold text-gray-700 dark:text-gray-300">Join Date</p>
-                    <p>{influencer.created_date.split('T')[0]}</p>
+                    <p>{influencer.created_date.split('T')[0]} {influencer.created_date.split('T')[1].split(':').slice(0, 2).join(':')}</p>
                 </div>
                 <div>
-                    <p className="font-semibold text-gray-700 dark:text-gray-300">Last Active Time</p>
+                    <p className="font-semibold text-gray-700 dark:text-gray-300">Time</p>
                     <p>{influencer.created_date.split('T')[1].split(':').slice(0, 2).join(':')}</p>
                 </div>
             </div>
@@ -169,6 +203,22 @@ const InfluencerDetail: React.FC<InfluencerDetailProps> = ({ influencer, onBack 
                 </button>
             </div>
         )}
+      </div>
+      {influencer?.pricings && influencer?.pricings?.length > 0 && (
+        <div className="mt-8">
+            <PackagesSection packages={influencer.pricings} />
+        </div>
+      )}
+      {influencer?.portfolio && influencer?.portfolio?.length > 0 && (
+        <div className="mt-8">
+            <ContentHighlights highlights={influencer.portfolio} />
+        </div>
+      )}
+      {influencer?.faq && influencer?.faq?.length > 0 && (
+        <div className="mt-8">
+            <FaqsSection faqs={influencer.faq} />
+        </div>
+      )}
       </div>
     </>
   );

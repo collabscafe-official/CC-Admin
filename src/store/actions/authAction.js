@@ -2,7 +2,7 @@ import collabs from "../../config/collabs";
 import { LOGIN, LOGOUT } from "../types";
 import { toast } from "react-toastify";
 
-export const login = (email, password) => {
+export const login = (email, password, callback) => {
     return async (dispatch) => {
         try {
             const response = await collabs.post("/auth/admin/signin", { email, password });
@@ -14,11 +14,15 @@ export const login = (email, password) => {
                 dispatch({ type: LOGIN, payload: userData });
                 toast.success(response.data.message || 'Login successful');
                 collabs.defaults.headers.common['Authorization'] = "Bearer " + token;
+                callback();
             } else {
                 toast.error(response.data.message || 'Login failed');
+                callback();
             }
         } catch (error) {
             toast.error(error.response.data.message || 'Login failed');
+            callback();
+            console.log(error);
         }
     }
 }

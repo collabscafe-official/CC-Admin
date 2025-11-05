@@ -179,7 +179,6 @@ const Influencers: React.FC = () => {
                 <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-dark-700 dark:text-gray-400">
                     <tr>
                         <th scope="col" className="px-6 py-3">Date</th>
-                        <th scope="col" className="px-6 py-3">Time</th>
                         <th scope="col" className="px-6 py-3">Profile</th>
                         <th scope="col" className="px-6 py-3">Name</th>
                         <th scope="col" className="px-6 py-3">Email</th>
@@ -193,8 +192,7 @@ const Influencers: React.FC = () => {
                 <tbody>
                     {creators?.profiles.map((influencer) => (
                         <tr key={influencer._id} className="bg-white border-b dark:bg-dark-800 dark:border-dark-700 hover:bg-gray-50 dark:hover:bg-dark-700/50">
-                            <td className="px-6 py-4 whitespace-nowrap">{influencer.created_date.split('T')[0]}</td>
-                            <td className="px-6 py-4 whitespace-nowrap">{influencer.created_date.split('T')[1].split(':').slice(0, 2).join(':')}</td>
+                            <td className="px-6 py-4 whitespace-nowrap">{influencer.created_date.split('T')[0]} {influencer.created_date.split('T')[1].split(':').slice(0, 2).join(':')}</td>
                             <td className="px-6 py-4">
                                 <img className="w-10 h-10 rounded-full" src={influencer.profile_image || `https://eu.ui-avatars.com/api/?name=${influencer.name}&size=250&background=random`} alt={`${influencer.name} avatar`} />
                             </td>

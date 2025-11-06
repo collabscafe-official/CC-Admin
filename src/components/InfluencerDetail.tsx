@@ -57,6 +57,16 @@ const TikTokIcon = () => (
   </svg>
 );
 
+const LocationIcon = () => (
+  <svg className="w-6 h-6 mr-1 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+);
+
+const VerifiedIcon = () => (
+  <svg className="w-6 h-6 text-green-500" viewBox="0 0 24 24" fill="currentColor">
+    <path fillRule="evenodd" d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm3.414 7.914a1 1 0 00-1.414-1.414L11 11.586l-1.293-1.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+  </svg>
+);
+
 
 interface InfluencerDetailProps {
   influencer: Influencer;
@@ -76,134 +86,162 @@ const InfluencerDetail: React.FC<InfluencerDetailProps> = ({ influencer, onBack 
         <h2 className="text-3xl font-semibold text-gray-700 dark:text-gray-200">
           Influencer Profile
         </h2>
-        <button
-            onClick={onBack}
-            className="inline-flex items-center px-4 py-2 text-sm font-medium text-white transition-opacity duration-150 bg-gradient-to-r from-primary to-primary-accent rounded-lg hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary dark:focus:ring-offset-dark-800"
-        >
-           <BackIcon />
-           Back to Influencers
-        </button>
-      </div>
-      <div className="p-8 bg-white rounded-lg shadow-md dark:bg-dark-800">
-        <div className="flex flex-col items-center text-center">
-          <img
-            className="object-cover w-24 h-24 mb-4 rounded-full ring-4 ring-primary"
-            src={influencer.profile_image || `https://eu.ui-avatars.com/api/?name=${influencer.name}&size=250&background=random`}
-            alt={`${influencer.name}'s profile`}
-          />
-          <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
-            {influencer.name}
-          </h3>
-          {/* <div className="mt-2">
-                <StatusBadge status={influencer.is_active ? 'Active' : 'Inactive'} />
-            </div> */}
-          {influencer.social_handles && influencer.social_handles.length > 0 && (
-            <div className="flex justify-center mt-4 space-x-4 text-gray-500 dark:text-gray-400">
-              {influencer.social_handles.map((socialHandle: any) => {
-                if (!socialHandle.is_active || socialHandle.is_deleted) return null;
-
-                switch (socialHandle.platform?.toLowerCase()) {
-                  case 'instagram':
-                    return (
-                      <a
-                        key={socialHandle._id}
-                        href={socialHandle.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex flex-col items-center transition-colors hover:text-primary"
-                      >
-                        <InstagramIcon />
-                        <span className="text-xs mt-1">{socialHandle.follower_range}</span>
-                      </a>
-                    );
-                  case 'twitter':
-                    return (
-                      <a
-                        key={socialHandle._id}
-                        href={socialHandle.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex flex-col items-center transition-colors hover:text-primary"
-                      >
-                        <XIcon />
-                        <span className="text-xs mt-1">{socialHandle.follower_range}</span>
-                      </a>
-                    );
-                  case 'youtube':
-                    return (
-                      <a
-                        key={socialHandle._id}
-                        href={socialHandle.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex flex-col items-center transition-colors hover:text-primary"
-                      >
-                        <YouTubeIcon />
-                        <span className="text-xs mt-1">{socialHandle.follower_range}</span>
-                      </a>
-                    );
-                    case 'tiktok':
-                      return (
-                        <a
-                          key={socialHandle._id}
-                          href={socialHandle.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex flex-col items-center transition-colors hover:text-primary"
-                        >
-                          <TikTokIcon />
-                          <span className="text-xs mt-1">{socialHandle.follower_range}</span>
-                        </a>
-                      );
-                  default:
-                    return null;
-                }
-              })}
-            </div>
-          )}
-          {influencer.profile_description && (
-            <p className="max-w-lg mx-auto mt-4 text-sm text-gray-600 dark:text-gray-400">
-              {influencer.profile_description}
-            </p>
-          )}
-        </div>
-        
-
-        <div className="mt-8 text-sm text-left text-gray-600 dark:text-gray-400 border-t border-gray-200 dark:border-dark-700 pt-6">
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                <div>
-                    <p className="font-semibold text-gray-700 dark:text-gray-300">Email Address</p>
-                    <a href={`mailto:${influencer.email}`} className="font-semibold bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary-accent hover:underline">{influencer.email}</a>
-                </div>
-                 <div>
-                    <p className="font-semibold text-gray-700 dark:text-gray-300">Phone Number</p>
-                    <p>{influencer.phone}</p>
-                </div>
-                 <div className="sm:col-span-2">
-                    <p className="font-semibold text-gray-700 dark:text-gray-300">Address</p>
-                    <p>{influencer.country ? influencer.country.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ') : ''}{influencer.city ? ', ' + influencer.city.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ') : ''}</p>
-                </div>
-                <div>
-                    <p className="font-semibold text-gray-700 dark:text-gray-300">Join Date</p>
-                    <p>{influencer.created_date.split('T')[0]} {influencer.created_date.split('T')[1].split(':').slice(0, 2).join(':')}</p>
-                </div>
-                <div>
-                    <p className="font-semibold text-gray-700 dark:text-gray-300">Time</p>
-                    <p>{influencer.created_date.split('T')[1].split(':').slice(0, 2).join(':')}</p>
-                </div>
-            </div>
-        </div>
-        {!influencer?.is_approved_by_admin && (
-            <div className="mt-8 text-sm text-left text-gray-600 dark:text-gray-400 border-t border-gray-200 dark:border-dark-700 pt-6">
+        <div className="flex items-center space-x-4">
+            {!influencer.is_approved_by_admin && (
                 <button
                     onClick={() => handleApproveCreator(influencer._id)}
-                    className="inline-flex items-center px-4 py-2 text-sm font-medium text-white transition-opacity duration-150 bg-gradient-to-r from-primary to-primary-accent rounded-lg hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary dark:focus:ring-offset-dark-800"
+                    className="inline-flex items-center px-4 py-2 text-sm font-medium text-white transition-opacity duration-150 bg-green-600 rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 dark:focus:ring-offset-dark-800"
                 >
-                    Approve Creator
+                   Approve Profile
                 </button>
-            </div>
-        )}
+            )}
+            <button
+                onClick={onBack}
+                className="inline-flex items-center px-4 py-2 text-sm font-medium text-white transition-opacity duration-150 rounded-lg bg-gradient-to-r from-primary to-primary-accent hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary dark:focus:ring-offset-dark-800"
+            >
+               <BackIcon />
+               Back to Influencers
+            </button>
+        </div>
       </div>
+
+        <div className="p-8 bg-white rounded-lg shadow-md dark:bg-dark-800">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="md:col-span-2 flex flex-col sm:flex-row items-center sm:items-start text-center sm:text-left">
+              <img
+                className="object-cover w-32 h-32 mb-4 rounded-full sm:mb-0 sm:mr-8 flex-shrink-0"
+                src={influencer?.profile_image || `https://eu.ui-avatars.com/api/?name=${influencer?.name}&size=250&background=random`}
+                alt={`${influencer?.name}'s profile`}
+              />
+              <div className="flex-grow">
+              <div className="flex items-center justify-center sm:justify-start mb-1 flex-wrap gap-x-4 gap-y-2">
+                  <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
+                    {influencer?.name}
+                  </h3>
+                  {influencer?.is_email_verified && <span className="ml-0"><VerifiedIcon /></span>}
+                  <span className={`px-3 py-1 text-xs font-semibold rounded-full ${influencer?.is_approved_by_admin
+                      ? 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300'
+                      : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300'
+                    }`}>
+                    {influencer?.is_approved_by_admin ? 'Approved' : 'Pending Approval'}
+                  </span>
+                </div>
+                <p className="font-semibold text-gray-600 dark:text-gray-300">{influencer?.profile_title}</p>
+                <p className="mt-3 text-sm text-gray-500 dark:text-gray-400">
+                  {influencer?.profile_description}
+                </p>
+                <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 mt-4">
+                  {influencer.social_handles && influencer.social_handles.length > 0 && (
+                    <div className="flex justify-center space-x-4 text-gray-500 dark:text-gray-400">
+                      {influencer.social_handles.map((socialHandle: any) => {
+                        if (!socialHandle.is_active || socialHandle.is_deleted) return null;
+
+                        switch (socialHandle.platform?.toLowerCase()) {
+                          case 'instagram':
+                            return (
+                              <a
+                                key={socialHandle._id}
+                                href={socialHandle.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex flex-row items-center gap-2 transition-colors hover:text-primary"
+                              >
+                                <InstagramIcon />
+                                <span className="text-xs mt-1">{socialHandle.follower_range}</span>
+                              </a>
+                            );
+                          case 'twitter':
+                            return (
+                              <a
+                                key={socialHandle._id}
+                                href={socialHandle.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex flex-row items-center gap-2 transition-colors hover:text-primary"
+                              >
+                                <XIcon />
+                                <span className="text-xs mt-1">{socialHandle.follower_range}</span>
+                              </a>
+                            );
+                          case 'youtube':
+                            return (
+                              <a
+                                key={socialHandle._id}
+                                href={socialHandle.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex flex-row items-center gap-2 transition-colors hover:text-primary"
+                              >
+                                <YouTubeIcon />
+                                <span className="text-xs mt-1">{socialHandle?.follower_range}</span>
+                              </a>
+                            );
+                          case 'tiktok':
+                            return (
+                              <a
+                                key={socialHandle._id}
+                                href={socialHandle.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex flex-row items-center gap-2 transition-colors hover:text-primary"
+                              >
+                                <TikTokIcon />
+                                <span className="text-xs mt-1">{socialHandle.follower_range}</span>
+                              </a>
+                            );
+                          default:
+                            return null;
+                        }
+                      })}
+                    </div>
+                  )}
+                </div>
+                <div className="flex items-center justify-center sm:justify-start mt-4">
+                  {influencer?.city && influencer?.country && (
+                    <>
+                      <LocationIcon />
+                      <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">{influencer?.city}, {influencer?.country}</span>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="md:col-span-1 md:border-l md:pl-8 border-gray-200 dark:border-dark-700">
+              <h4 className="text-lg font-bold text-gray-900 dark:text-white mb-4">My Content Niches</h4>
+              <div className="flex flex-wrap gap-2">
+                {influencer?.niches?.map((niche: any) => (
+                  <span key={niche._id} className="px-3 py-1 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-200 rounded-full dark:bg-dark-700 dark:text-gray-300 dark:border-dark-600">{niche?.name}</span>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-8 p-8 bg-white rounded-lg shadow-md dark:bg-dark-800">
+          <h4 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Contact Info</h4>
+          <div className="mt-8 text-sm text-left text-gray-600 dark:text-gray-400 border-t border-gray-200 dark:border-dark-700 pt-6">
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+              <div>
+                <p className="font-semibold text-gray-700 dark:text-gray-300">Email Address</p>
+                <a href={`mailto:${influencer?.email}`} className="flex flex-row items-center gap-2 font-semibold bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary-accent hover:underline">{influencer?.email} {influencer?.is_email_verified && <VerifiedIcon />}</a>
+              </div>
+              <div>
+                <p className="font-semibold text-gray-700 dark:text-gray-300">Phone Number</p>
+                <p>{influencer?.phone}</p>
+              </div>
+              <div>
+                <p className="font-semibold text-gray-700 dark:text-gray-300">Address</p>
+                <p>{influencer?.country ? influencer?.country?.split(' ').map(word => word.charAt(0).toUpperCase() + word?.slice(1).toLowerCase()).join(' ') : ''}{influencer?.city ? ', ' + influencer?.city?.split(' ').map(word => word.charAt(0).toUpperCase() + word?.slice(1).toLowerCase()).join(' ') : ''}</p>
+              </div>
+              <div>
+                <p className="font-semibold text-gray-700 dark:text-gray-300">Join Date</p>
+                <p>{influencer?.created_date.split('T')[0]} {influencer?.created_date.split('T')[1].split(':').slice(0, 2).join(':')}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
       {influencer?.pricings && influencer?.pricings?.length > 0 && (
         <div className="mt-8">
             <PackagesSection packages={influencer.pricings} />

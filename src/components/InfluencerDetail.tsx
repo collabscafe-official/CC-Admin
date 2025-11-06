@@ -1,6 +1,6 @@
 import React from 'react';
-import { Influencer } from '../types';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
+import { useLocation, useParams, useNavigate } from 'react-router-dom';
 import { approveCreator } from '../store/actions/creatorAction';
 import PackagesSection from './PackagesSection';
 import ContentHighlights from './ContentHighlights';
@@ -67,18 +67,27 @@ const VerifiedIcon = () => (
   </svg>
 );
 
-
-interface InfluencerDetailProps {
-  influencer: Influencer;
-  onBack: () => void;
-}
-
-const InfluencerDetail: React.FC<InfluencerDetailProps> = ({ influencer, onBack }) => {
+const InfluencerDetail: React.FC = () => {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
+  const { id } = useParams();
+  const location = useLocation() as any;
+  const creators = useSelector((state: any) => state.creators);
+
+  const influencer = location.state?.influencer || creators?.profiles?.find((p: any) => p._id === id);
 
   const handleApproveCreator = (id: string) => {
     dispatch(approveCreator(id) as any);
   };
+
+  if (!influencer) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-gray-500">Influencer not found.</div>
+      </div>
+    );
+  }
+
   return (
     <>
     <div className="mb-10">
@@ -96,7 +105,7 @@ const InfluencerDetail: React.FC<InfluencerDetailProps> = ({ influencer, onBack 
                 </button>
             )}
             <button
-                onClick={onBack}
+                onClick={() => navigate(-1)}
                 className="inline-flex items-center px-4 py-2 text-sm font-medium text-white transition-opacity duration-150 rounded-lg bg-gradient-to-r from-primary to-primary-accent hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary dark:focus:ring-offset-dark-800"
             >
                <BackIcon />

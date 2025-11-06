@@ -1,10 +1,9 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Influencer } from '../types';
-import InfluencerDetail from './InfluencerDetail';
 import DeleteConfirmationModal from './DeleteConfirmationModal';
 import { getCreators } from '../store/actions/creatorAction';
 import { useDispatch, useSelector } from 'react-redux';
-import collabs from '../config/collabs';
+import { useNavigate } from 'react-router-dom';
 
 const initialInfluencersData: Influencer[] = Array.from({ length: 25 }, (_, i) => {
   const statuses: ('Active' | 'Pending' | 'Inactive')[] = ['Active', 'Pending', 'Inactive'];
@@ -66,6 +65,7 @@ const SearchIcon = () => (
 const Influencers: React.FC = () => {
     const dispatch = useDispatch();
     const creators = useSelector((state: any) => state.creators);
+    const navigate = useNavigate();
     const [influencersList, setInfluencersList] = useState(initialInfluencersData);
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState('All');
@@ -110,8 +110,8 @@ const Influencers: React.FC = () => {
         setCurrentPage((prev) => Math.min(prev + 1, totalPages));
     };
 
-    const handleViewProfile = (influencer: Influencer) => {
-        setSelectedInfluencer(influencer);
+    const handleViewProfile = (influencer: any) => {
+        navigate(`/influencers/${influencer._id}`, { state: { influencer } });
     };
 
     const handleOpenDeleteModal = (influencer: Influencer) => {
@@ -131,10 +131,6 @@ const Influencers: React.FC = () => {
         }
     };
     
-    if (selectedInfluencer) {
-        return <InfluencerDetail influencer={selectedInfluencer} onBack={() => setSelectedInfluencer(null)} />;
-    }
-
     if (isLoading) {
         return (
           <div className="flex items-center justify-center h-screen bg-dark-900">

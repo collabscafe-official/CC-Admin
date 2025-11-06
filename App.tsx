@@ -1,13 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, Suspense, lazy } from 'react';
 import { ThemeProvider } from './src/context/ThemeContext';
-import LoginPage from './src/components/LoginPage';
 import Sidebar from './src/components/Sidebar';
 import Header from './src/components/Header';
-import Dashboard from './src/components/Dashboard';
-import Influencers from './src/components/Influencers';
-import Brands from './src/components/Brands';
 import { Provider, useSelector } from 'react-redux';
 import store from './src/store/store';
+import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
+
+const Dashboard = lazy(() => import('./src/components/Dashboard'));
+const Influencers = lazy(() => import('./src/components/Influencers'));
+const InfluencerDetail = lazy(() => import('./src/components/InfluencerDetail'));
+const Brands = lazy(() => import('./src/components/Brands'));
+const LoginPage = lazy(() => import('./src/components/LoginPage'));
 
 const App: React.FC = () => {
   return (
@@ -20,33 +23,76 @@ const App: React.FC = () => {
 };
 
 const Main: React.FC = () => {
-
   const user = useSelector((state: any) => state.user);
   const [isSidebarOpen, setSidebarOpen] = useState(false);
-  const [activeScreen, setActiveScreen] = useState('Dashboard');
+  const location = useLocation();
+  const navigate = useNavigate();
 
-  if (!user) {
-    return <LoginPage />;
-  }
+  const pathname = location.pathname;
+  const activeScreen = pathname.startsWith('/influencers')
+    ? 'Influencers'
+    : pathname.startsWith('/brands')
+      ? 'Brands'
+      : 'Dashboard';
 
-  return (    
+  const setActiveScreen = (screen: string) => {
+    switch (screen) {
+      case 'Influencers':
+        navigate('/influencers');
+        break;
+      case 'Brands':
+        navigate('/brands');
+        break;
+      case 'Dashboard':
+      default:
+        navigate('/dashboard');
+        break;
+    }
+  };
+
+  return (
     <div className="flex h-screen bg-gray-100 dark:bg-dark-900">
-      <Sidebar
-        isOpen={isSidebarOpen}
-        setIsOpen={setSidebarOpen}
-        activeScreen={activeScreen}
-        setActiveScreen={setActiveScreen}
-      />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Header toggleSidebar={() => setSidebarOpen(!isSidebarOpen)} />
-        <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 dark:bg-dark-900">
-          <div className="container mx-auto px-6 py-8">
-            {activeScreen === 'Dashboard' && <Dashboard />}
-            {activeScreen === 'Influencers' && <Influencers />}
-            {activeScreen === 'Brands' && <Brands />}
+      {user ? (
+        <>
+          <Sidebar
+            isOpen={isSidebarOpen}
+            setIsOpen={setSidebarOpen}
+            activeScreen={activeScreen}
+            setActiveScreen={setActiveScreen}
+          />
+          <div className="flex-1 flex flex-col overflow-hidden">
+            <Header toggleSidebar={() => setSidebarOpen(!isSidebarOpen)} />
+            <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 dark:bg-dark-900">
+              <div className="container mx-auto px-6 py-8">
+                <Suspense fallback={<div className="w-full py-10 text-center text-gray-500">Loading...</div>}>
+                  <Routes>
+                    <Route path="/dashboard" element={<Dashboard />} />
+                    <Route path="/influencers" element={<Influencers />} />
+                    <Route path="/influencers/:id" element={<InfluencerDetail />} />
+                    <Route path="/brands" element={<Brands />} />
+                    <Route path="/login" element={<Navigate to="/dashboard" replace />} />
+                    <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                    <Route path="*" element={<Navigate to="/dashboard" replace />} />
+                  </Routes>
+                </Suspense>
+              </div>
+            </main>
           </div>
-        </main>
-      </div>
+        </>
+      ) : (
+        <div className="flex-1 flex flex-col overflow-hidden w-full">
+          <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 dark:bg-dark-900">
+            <div className="container mx-auto px-6 py-8">
+              <Suspense fallback={<div className="w-full py-10 text-center text-gray-500">Loading...</div>}>
+                <Routes>
+                  <Route path="/login" element={<LoginPage />} />
+                  <Route path="*" element={<Navigate to="/login" replace />} />
+                </Routes>
+              </Suspense>
+            </div>
+          </main>
+        </div>
+      )}
     </div>
   );
 };

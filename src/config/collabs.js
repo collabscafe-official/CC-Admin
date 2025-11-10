@@ -1,5 +1,7 @@
 import Axios from "axios"
 import config from "./config"
+import Store from "../store/store"
+import { logout } from "../store/actions/authAction"
 const collabs = Axios.create({
     baseURL: config.base_url,
     // baseURL: 'https://cclive.collabscafe.com/v1',
@@ -14,5 +16,19 @@ collabs.interceptors.request.use(config => {
     }
     return config;
 });
+
+collabs.interceptors.response.use(
+    response => response,
+    error => {
+        if (error?.response?.status === 401) {
+            Store.dispatch(logout());
+            localStorage.removeItem('dashboard-user');
+            if (typeof window !== "undefined" && window.location.pathname !== "/login") {
+                window.location.href = "/login";
+            }
+        }
+        return Promise.reject(error);
+    }
+);
 
 export default collabs

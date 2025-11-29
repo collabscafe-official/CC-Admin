@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { connect } from 'react-redux';
 import * as authActions from '../store/actions/authAction';
 
@@ -15,6 +15,19 @@ const LoginPage: React.FC<{ login: (email: string, password: string) => void }> 
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  
+  useEffect(() => {
+    // Prevent body scrolling
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+    
+    return () => {
+      // Restore scrolling when component unmounts
+      document.body.style.overflow = '';
+      document.documentElement.style.overflow = '';
+    };
+  }, []);
+  
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (email && password) {
@@ -24,7 +37,7 @@ const LoginPage: React.FC<{ login: (email: string, password: string) => void }> 
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-dark-900">
+    <div className="fixed inset-0 flex items-center justify-center h-screen w-screen overflow-hidden bg-gray-50 dark:bg-dark-900">
       <div className="w-full max-w-md p-8 space-y-8 bg-white rounded-2xl shadow-xl dark:bg-dark-800">
         <div className="flex flex-col items-center">
           <AppIcon />

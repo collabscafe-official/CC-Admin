@@ -47,6 +47,16 @@ export interface Influencer {
   phone: string;
   address: string;
   status: 'Active' | 'Pending' | 'Inactive';
+  // New filter fields
+  is_active: number;
+  is_email_verified: number;
+  is_profile_completed: number;
+  is_approved_by_admin: number;
+  is_featured: number;
+  country: string;
+  state: string;
+  city: string;
+  gender: string;
 }
 
 export interface Brand {

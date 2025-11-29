@@ -1,29 +1,9 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Influencer } from '../types';
 import DeleteConfirmationModal from './DeleteConfirmationModal';
-import { getCreators } from '../store/actions/creatorAction';
+import { getCreators, deleteCreator } from '../store/actions/creatorAction';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate, useLocation } from 'react-router-dom';
-
-const initialInfluencersData: Influencer[] = Array.from({ length: 25 }, (_, i) => {
-  const statuses: ('Active' | 'Pending' | 'Inactive')[] = ['Active', 'Pending', 'Inactive'];
-  const firstNames = ['Elena', 'John', 'Aisha', 'Kenji', 'Chloe', 'Liam', 'Olivia', 'Noah', 'Emma', 'Oliver'];
-  const lastNames = ['Rodriguez', 'Smith', 'Khan', 'Tanaka', 'Dubois', 'Garcia', 'Jones', 'Miller', 'Davis', 'Wilson'];
-  const name = `${firstNames[i % firstNames.length]} ${lastNames[i % lastNames.length]}`;
-  const email = `${name.toLowerCase().replace(' ', '.').replace(/[0-9]/g, '')}${i+1}@example.com`;
-  const date = new Date(Date.now() - i * 1000 * 60 * 60 * 24);
-  
-  return {
-    id: i + 1,
-    date: date.toISOString().split('T')[0],
-    time: `${(i % 12) + 1}:${String(i * 5 % 60).padStart(2, '0')} ${i % 2 === 0 ? 'AM' : 'PM'}`,
-    name: `${name} ${i+1}`,
-    email: email,
-    phone: `555-01${String(i).padStart(2, '0')}`,
-    address: `${100 + i} Main St, USA`,
-    status: statuses[i % statuses.length],
-  };
-});
 
 
 const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
@@ -62,31 +42,95 @@ const SearchIcon = () => (
     <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
 );
 
+const FilterIcon = () => (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path>
+    </svg>
+);
+
 const Influencers: React.FC = () => {
     const dispatch = useDispatch();
     const creators = useSelector((state: any) => state.creators);
     const navigate = useNavigate();
-    const location = useLocation() as any;
-    const [influencersList, setInfluencersList] = useState(initialInfluencersData);
+    const location = useLocation() as any;  
     const [searchQuery, setSearchQuery] = useState('');
-    const [statusFilter, setStatusFilter] = useState('All');
     const [currentPage, setCurrentPage] = useState(location.state?.currentPage || 1);
     const [itemsPerPage, setItemsPerPage] = useState(location.state?.itemsPerPage || 10);
-    const [selectedInfluencer, setSelectedInfluencer] = useState<Influencer | null>(null);
     const [isDeleteModalOpen, setDeleteModalOpen] = useState(false);
     const [influencerToDelete, setInfluencerToDelete] = useState<Influencer | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const isRestoringFromNavigation = useRef(false);
 
+    const [showFilters, setShowFilters] = useState(false);
+
+    // Filter states
+    const [filters, setFilters] = useState({
+        is_active: '',
+        is_email_verified: '',
+        is_profile_completed: '',
+        is_approved_by_admin: '',
+        is_featured: '',
+        country: '',
+        state: '',
+        city: '',
+        gender: '',
+        status: 'All' // Kept status for compatibility with existing logical flow
+    });
+
+    const handleFilterChange = (key: string, value: string) => {
+        setFilters(prev => ({ ...prev, [key]: value }));
+        setCurrentPage(1);
+    };
+
+    const clearFilters = () => {
+        setFilters({
+            is_active: '',
+            is_email_verified: '',
+            is_profile_completed: '',
+            is_approved_by_admin: '',
+            is_featured: '',
+            country: '',
+            state: '',
+            city: '',
+            gender: '',
+            status: 'All'
+        });
+        setSearchQuery('');
+        setCurrentPage(1);
+    };
+
     const filteredInfluencers = useMemo(() => {
-        return influencersList
-            .filter(influencer =>
-                influencer.name.toLowerCase().includes(searchQuery.toLowerCase())
-            )
-            .filter(influencer =>
-                statusFilter === 'All' || influencer.status === statusFilter
-            );
-    }, [influencersList, searchQuery, statusFilter]);
+        if (!creators?.profiles || !Array.isArray(creators.profiles)) {
+            return [];
+        }
+        return creators.profiles.filter(influencer => {
+            // Text Search
+            if (searchQuery && !influencer.name.toLowerCase().includes(searchQuery.toLowerCase())) {
+                return false;
+            }
+
+            // Status Filter (Original)
+            if (filters.status !== 'All' && influencer.status !== filters.status) {
+                return false;
+            }
+
+            // Boolean Filters (0 or 1)
+            // We compare string value from select ('0' or '1') with number value from object
+            if (filters.is_active !== '' && influencer.is_active !== parseInt(filters.is_active)) return false;
+            if (filters.is_email_verified !== '' && influencer.is_email_verified !== parseInt(filters.is_email_verified)) return false;
+            if (filters.is_profile_completed !== '' && influencer.is_profile_completed !== parseInt(filters.is_profile_completed)) return false;
+            if (filters.is_approved_by_admin !== '' && influencer.is_approved_by_admin !== parseInt(filters.is_approved_by_admin)) return false;
+            if (filters.is_featured !== '' && influencer.is_featured !== parseInt(filters.is_featured)) return false;
+
+            // String Filters (Case insensitive partial match for location, exact for gender)
+            if (filters.country && influencer.country && !influencer.country.toLowerCase().includes(filters.country.toLowerCase())) return false;
+            if (filters.state && influencer.state && !influencer.state.toLowerCase().includes(filters.state.toLowerCase())) return false;
+            if (filters.city && influencer.city && !influencer.city.toLowerCase().includes(filters.city.toLowerCase())) return false;
+            if (filters.gender !== '' && influencer.gender !== filters.gender) return false;
+
+            return true;
+        });
+    }, [creators?.profiles, searchQuery, filters]);
 
     // Update page state when location state changes (e.g., when navigating back)
     useEffect(() => {
@@ -114,15 +158,44 @@ const Influencers: React.FC = () => {
     }, [location.key]);
     
     useEffect(() => {
-        dispatch(getCreators(itemsPerPage, currentPage, () => setIsLoading(false)) as unknown as any);
-    }, [dispatch, itemsPerPage, currentPage]);
+        setIsLoading(true);
+        dispatch(getCreators(
+            itemsPerPage, 
+            currentPage, 
+            filters.is_active, 
+            filters.is_email_verified, 
+            filters.is_profile_completed, 
+            filters.is_approved_by_admin, 
+            filters.is_featured, 
+            filters.country, 
+            filters.state, 
+            filters.city, 
+            filters.gender, 
+            (success: boolean) => {
+                setIsLoading(false);
+            }
+        ) as unknown as any);
+    }, [
+        dispatch, 
+        itemsPerPage, 
+        currentPage, 
+        filters.is_active, 
+        filters.is_email_verified, 
+        filters.is_profile_completed, 
+        filters.is_approved_by_admin, 
+        filters.is_featured, 
+        filters.country, 
+        filters.state, 
+        filters.city, 
+        filters.gender
+    ]);
     
     useEffect(() => {
         // Only reset to page 1 if we're not restoring from navigation
         if (!isRestoringFromNavigation.current) {
             setCurrentPage(1);
         }
-    }, [searchQuery, statusFilter]);
+    }, [searchQuery]);
 
     // const totalPages = Math.ceil(filteredInfluencers.length / itemsPerPage);
     const totalPages = creators?.pagination?.total_count 
@@ -130,6 +203,9 @@ const Influencers: React.FC = () => {
         : 1;
 
     const paginatedInfluencers = useMemo(() => {
+        if (!filteredInfluencers || !Array.isArray(filteredInfluencers)) {
+            return [];
+        }
         const startIndex = (currentPage - 1) * itemsPerPage;
         return filteredInfluencers.slice(startIndex, startIndex + itemsPerPage);
     }, [filteredInfluencers, currentPage, itemsPerPage]);
@@ -164,7 +240,13 @@ const Influencers: React.FC = () => {
 
     const handleConfirmDelete = () => {
         if (influencerToDelete) {
-            setInfluencersList(prevList => prevList.filter(inf => inf.id !== influencerToDelete.id));
+            dispatch(deleteCreator(influencerToDelete._id, (success: boolean) => {
+                if (success) {
+                    setIsLoading(false);
+                } else {
+                    setIsLoading(false);
+                }
+            }) as unknown as any);
             handleCloseDeleteModal();
         }
     };
@@ -185,7 +267,7 @@ const Influencers: React.FC = () => {
 
       <div className="p-4 bg-white rounded-lg shadow-md dark:bg-dark-800">
         <div className="flex flex-col md:flex-row items-center justify-between mb-4 space-y-4 md:space-y-0 md:space-x-4">
-            <div className="relative w-full md:w-1/3">
+            <div className="relative w-full md:w-1/2">
                 <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
                     <SearchIcon />
                 </div>
@@ -197,17 +279,112 @@ const Influencers: React.FC = () => {
                     className="block w-full p-2 pl-10 text-sm text-gray-900 border border-gray-300 rounded-lg bg-gray-50 focus:ring-primary focus:border-primary dark:bg-dark-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-primary dark:focus:border-primary"
                 />
             </div>
-            <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="w-full md:w-auto p-2 text-sm text-gray-900 border border-gray-300 rounded-lg bg-gray-50 focus:ring-primary focus:border-primary dark:bg-dark-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-primary dark:focus:border-primary"
+            <button 
+                onClick={() => setShowFilters(!showFilters)}
+                className={`flex items-center px-4 py-2 text-sm font-medium border rounded-lg transition-colors ${showFilters ? 'bg-primary text-white border-primary' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 dark:bg-dark-700 dark:text-gray-300 dark:border-dark-600 dark:hover:bg-dark-600'}`}
             >
-                <option value="All">All Statuses</option>
-                <option value="Active">Active</option>
-                <option value="Pending">Pending</option>
-                <option value="Inactive">Inactive</option>
-            </select>
+                <FilterIcon />
+                <span className="ml-2">Filters</span>
+            </button>
         </div>
+                {/* Expandable Filter Grid */}
+                {showFilters && (
+            <div className="mb-6 p-4 border border-gray-200 rounded-lg bg-gray-50 dark:bg-dark-700/50 dark:border-dark-600">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {/* Status Select */}
+                     <div>
+                        <label className="block mb-1 text-xs font-medium text-gray-700 dark:text-gray-300">Status</label>
+                        <select
+                            value={filters.status}
+                            onChange={(e) => handleFilterChange('status', e.target.value)}
+                            className="w-full p-2 text-sm border rounded-md dark:bg-dark-700 dark:border-gray-600 dark:text-white"
+                        >
+                            <option value="All">All</option>
+                            <option value="Active">Active</option>
+                            <option value="Pending">Pending</option>
+                            <option value="Inactive">Inactive</option>
+                        </select>
+                    </div>
+
+                    {/* Gender Select */}
+                    <div>
+                        <label className="block mb-1 text-xs font-medium text-gray-700 dark:text-gray-300">Gender</label>
+                         <select
+                            value={filters.gender}
+                            onChange={(e) => handleFilterChange('gender', e.target.value)}
+                            className="w-full p-2 text-sm border rounded-md dark:bg-dark-700 dark:border-gray-600 dark:text-white"
+                        >
+                            <option value="">All</option>
+                            <option value="Male">Male</option>
+                            <option value="Female">Female</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+
+                    {/* Boolean Filters - Values 0 or 1 */}
+                    {[
+                        { key: 'is_active', label: 'Is Active (0/1)' },
+                        { key: 'is_email_verified', label: 'Email Verified' },
+                        { key: 'is_profile_completed', label: 'Profile Completed' },
+                        { key: 'is_approved_by_admin', label: 'Admin Approved' },
+                        { key: 'is_featured', label: 'Featured' }
+                    ].map((f) => (
+                        <div key={f.key}>
+                            <label className="block mb-1 text-xs font-medium text-gray-700 dark:text-gray-300">{f.label}</label>
+                            <select
+                                value={filters[f.key as keyof typeof filters]}
+                                onChange={(e) => handleFilterChange(f.key, e.target.value)}
+                                className="w-full p-2 text-sm border rounded-md dark:bg-dark-700 dark:border-gray-600 dark:text-white"
+                            >
+                                <option value="">All</option>
+                                <option value="1">Yes</option>
+                                <option value="0">No</option>
+                            </select>
+                        </div>
+                    ))}
+
+                    {/* Location Inputs */}
+                    <div>
+                         <label className="block mb-1 text-xs font-medium text-gray-700 dark:text-gray-300">Country</label>
+                         <input 
+                            type="text" 
+                            placeholder="Country"
+                            value={filters.country} 
+                            onChange={(e) => handleFilterChange('country', e.target.value)}
+                            className="w-full p-2 text-sm border rounded-md dark:bg-dark-700 dark:border-gray-600 dark:text-white"
+                        />
+                    </div>
+                    <div>
+                         <label className="block mb-1 text-xs font-medium text-gray-700 dark:text-gray-300">State</label>
+                         <input 
+                            type="text" 
+                            placeholder="State"
+                            value={filters.state} 
+                            onChange={(e) => handleFilterChange('state', e.target.value)}
+                            className="w-full p-2 text-sm border rounded-md dark:bg-dark-700 dark:border-gray-600 dark:text-white"
+                        />
+                    </div>
+                     <div>
+                         <label className="block mb-1 text-xs font-medium text-gray-700 dark:text-gray-300">City</label>
+                         <input 
+                            type="text" 
+                            placeholder="City"
+                            value={filters.city} 
+                            onChange={(e) => handleFilterChange('city', e.target.value)}
+                            className="w-full p-2 text-sm border rounded-md dark:bg-dark-700 dark:border-gray-600 dark:text-white"
+                        />
+                    </div>
+                </div>
+                <div className="flex justify-end mt-4">
+                    <button 
+                        onClick={clearFilters}
+                        className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white"
+                    >
+                        Clear Filters
+                    </button>
+                </div>
+            </div>
+        )}
         <div className="overflow-x-auto">
             <table className="w-full text-sm text-left text-gray-500 dark:text-gray-400">
                 <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-dark-700 dark:text-gray-400">
@@ -224,7 +401,8 @@ const Influencers: React.FC = () => {
                     </tr>
                 </thead>
                 <tbody>
-                    {creators?.profiles.map((influencer) => (
+                {creators?.profiles && Array.isArray(creators.profiles) && creators.profiles.length > 0 ? (
+                    creators.profiles.map((influencer) => (
                         <tr key={influencer._id} className="bg-white border-b dark:bg-dark-800 dark:border-dark-700 hover:bg-gray-50 dark:hover:bg-dark-700/50">
                             <td className="px-6 py-4 whitespace-nowrap">{influencer.created_date.split('T')[0]} {influencer.created_date.split('T')[1].split(':').slice(0, 2).join(':')}</td>
                             <td className="px-6 py-4">
@@ -254,7 +432,14 @@ const Influencers: React.FC = () => {
                                 </button> */}
                             </td>
                         </tr>
-                    ))}
+                    ))
+                ) : (
+                    <tr>
+                       <td colSpan={12} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
+                           No influencers found matching your filters.
+                       </td>
+                   </tr>
+               )}
                 </tbody>
             </table>
         </div>

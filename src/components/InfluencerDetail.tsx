@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useLocation, useParams, useNavigate } from 'react-router-dom';
-import { approveCreator } from '../store/actions/creatorAction';
+import { approveCreator, getCreators } from '../store/actions/creatorAction';
 import PackagesSection from './PackagesSection';
 import ContentHighlights from './ContentHighlights';
 import FaqsSection from './FaqsSection';
@@ -73,11 +73,26 @@ const InfluencerDetail: React.FC = () => {
   const { id } = useParams();
   const location = useLocation() as any;
   const creators = useSelector((state: any) => state.creators);
+  const [isApproving, setIsApproving] = useState(false);
 
   const influencer = location.state?.influencer || creators?.profiles?.find((p: any) => p._id === id);
+  const savedPage = location.state?.currentPage || 1;
+  const savedItemsPerPage = location.state?.itemsPerPage || 10;
 
   const handleApproveCreator = (id: string) => {
-    dispatch(approveCreator(id) as any);
+    setIsApproving(true);
+    dispatch(approveCreator(id, (success: boolean) => {
+      setIsApproving(false);
+      if (success) {
+        dispatch(getCreators(savedItemsPerPage, savedPage) as unknown as any);
+        navigate('/influencers', { state: { currentPage: savedPage, itemsPerPage: savedItemsPerPage } });
+      }
+    }) as unknown as any);
+  };
+
+  const handleBack = () => {
+    dispatch(getCreators(savedItemsPerPage, savedPage) as unknown as any);
+    navigate('/influencers', { state: { currentPage: savedPage, itemsPerPage: savedItemsPerPage } });
   };
 
   if (!influencer) {
@@ -99,13 +114,24 @@ const InfluencerDetail: React.FC = () => {
             {!influencer.is_approved_by_admin && (
                 <button
                     onClick={() => handleApproveCreator(influencer._id)}
-                    className="inline-flex items-center px-4 py-2 text-sm font-medium text-white transition-opacity duration-150 bg-green-600 rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 dark:focus:ring-offset-dark-800"
+                    disabled={isApproving}
+                    className="inline-flex items-center px-4 py-2 text-sm font-medium text-white transition-opacity duration-150 bg-green-600 rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 dark:focus:ring-offset-dark-800 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                   Approve Profile
+                   {isApproving ? (
+                     <>
+                       <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                       </svg>
+                       Approving...
+                     </>
+                   ) : (
+                     'Approve Profile'
+                   )}
                 </button>
             )}
             <button
-                onClick={() => navigate(-1)}
+                onClick={handleBack}
                 className="inline-flex items-center px-4 py-2 text-sm font-medium text-white transition-opacity duration-150 rounded-lg bg-gradient-to-r from-primary to-primary-accent hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary dark:focus:ring-offset-dark-800"
             >
                <BackIcon />

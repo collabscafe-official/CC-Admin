@@ -21,7 +21,7 @@ export const getCreators = (limit, page, callback) => {
     }
 }
 
-export const approveCreator = (id) => {
+export const approveCreator = (id, callback) => {
     return async (dispatch) => {
         try {
             const response = await collabs.put(`/admin/influencers/approve`, {
@@ -29,11 +29,13 @@ export const approveCreator = (id) => {
             });
             if (response.data.success) {
                 toast.success(response.data.message);
+                callback(true);
             } else {
-                toast.error(response.data.message);
+                callback(false);
             }
         } catch (error) {
             toast.error(error.response.data.message || 'Failed to approve creator');
+            callback(false);
         }
     }
 }

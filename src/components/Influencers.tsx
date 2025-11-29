@@ -1,9 +1,9 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Influencer } from '../types';
 import DeleteConfirmationModal from './DeleteConfirmationModal';
 import { getCreators } from '../store/actions/creatorAction';
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 const initialInfluencersData: Influencer[] = Array.from({ length: 25 }, (_, i) => {
   const statuses: ('Active' | 'Pending' | 'Inactive')[] = ['Active', 'Pending', 'Inactive'];
@@ -66,15 +66,17 @@ const Influencers: React.FC = () => {
     const dispatch = useDispatch();
     const creators = useSelector((state: any) => state.creators);
     const navigate = useNavigate();
+    const location = useLocation() as any;
     const [influencersList, setInfluencersList] = useState(initialInfluencersData);
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState('All');
-    const [currentPage, setCurrentPage] = useState(1);
-    const [itemsPerPage, setItemsPerPage] = useState(10);
+    const [currentPage, setCurrentPage] = useState(location.state?.currentPage || 1);
+    const [itemsPerPage, setItemsPerPage] = useState(location.state?.itemsPerPage || 10);
     const [selectedInfluencer, setSelectedInfluencer] = useState<Influencer | null>(null);
     const [isDeleteModalOpen, setDeleteModalOpen] = useState(false);
     const [influencerToDelete, setInfluencerToDelete] = useState<Influencer | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const isRestoringFromNavigation = useRef(false);
 
     const filteredInfluencers = useMemo(() => {
         return influencersList
@@ -86,16 +88,46 @@ const Influencers: React.FC = () => {
             );
     }, [influencersList, searchQuery, statusFilter]);
 
+    // Update page state when location state changes (e.g., when navigating back)
+    useEffect(() => {
+        if (location.state) {
+            const savedPage = location.state.currentPage;
+            const savedItemsPerPage = location.state.itemsPerPage;
+            
+            if (savedPage !== undefined || savedItemsPerPage !== undefined) {
+                isRestoringFromNavigation.current = true;
+                
+                if (savedPage !== undefined) {
+                    setCurrentPage(savedPage);
+                }
+                if (savedItemsPerPage !== undefined) {
+                    setItemsPerPage(savedItemsPerPage);
+                }
+                
+                // Clear the flag after state updates
+                setTimeout(() => {
+                    isRestoringFromNavigation.current = false;
+                }, 100);
+            }
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [location.key]);
+    
     useEffect(() => {
         dispatch(getCreators(itemsPerPage, currentPage, () => setIsLoading(false)) as unknown as any);
     }, [dispatch, itemsPerPage, currentPage]);
     
     useEffect(() => {
-        setCurrentPage(1);
-    }, [searchQuery, statusFilter, itemsPerPage]);
+        // Only reset to page 1 if we're not restoring from navigation
+        if (!isRestoringFromNavigation.current) {
+            setCurrentPage(1);
+        }
+    }, [searchQuery, statusFilter]);
 
     // const totalPages = Math.ceil(filteredInfluencers.length / itemsPerPage);
-    const totalPages = Math.ceil(creators?.pagination?.total_count / itemsPerPage);
+    const totalPages = creators?.pagination?.total_count 
+        ? Math.ceil(creators.pagination.total_count / itemsPerPage) 
+        : 1;
 
     const paginatedInfluencers = useMemo(() => {
         const startIndex = (currentPage - 1) * itemsPerPage;
@@ -111,7 +143,13 @@ const Influencers: React.FC = () => {
     };
 
     const handleViewProfile = (influencer: any) => {
-        navigate(`/influencers/${influencer._id}`, { state: { influencer } });
+        navigate(`/influencers/${influencer._id}`, { 
+            state: { 
+                influencer,
+                currentPage,
+                itemsPerPage
+            } 
+        });
     };
 
     const handleOpenDeleteModal = (influencer: Influencer) => {

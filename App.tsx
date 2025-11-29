@@ -63,7 +63,8 @@ const Main: React.FC = () => {
           <div className="flex-1 flex flex-col overflow-hidden">
             <Header toggleSidebar={() => setSidebarOpen(!isSidebarOpen)} />
             <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 dark:bg-dark-900">
-              <div className="container mx-auto px-6 py-8">
+              {/* <div className="container mx-auto px-6 py-8"> */}
+              <div className="px-6 py-8">
                 <Suspense fallback={<div className="flex items-center justify-center h-screen bg-dark-900">
                   <div className="w-16 h-16 border-4 border-dashed rounded-full animate-spin border-primary"></div>
                 </div>}>
@@ -84,8 +85,11 @@ const Main: React.FC = () => {
       ) : (
         <div className="flex-1 flex flex-col overflow-hidden w-full">
           <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 dark:bg-dark-900">
-            <div className="container mx-auto px-6 py-8">
-              <Suspense fallback={<div className="w-full py-10 text-center text-gray-500">Loading...</div>}>
+            {/* <div className="container mx-auto px-6 py-8"> */}
+            <div className="px-6 py-8">
+              <Suspense fallback={<div className="flex items-center justify-center h-screen bg-dark-900">
+                  <div className="w-16 h-16 border-4 border-dashed rounded-full animate-spin border-primary"></div>
+                </div>}>
                 <Routes>
                   <Route path="/login" element={<LoginPage />} />
                   <Route path="*" element={<Navigate to="/login" replace />} />

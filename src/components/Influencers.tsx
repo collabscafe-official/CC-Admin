@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Influencer } from '../types';
 import DeleteConfirmationModal from './DeleteConfirmationModal';
 import { getCreators, deleteCreator } from '../store/actions/creatorAction';
+import { getCountries, getStates, getCities } from '../store/actions/globalActions';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate, useLocation } from 'react-router-dom';
 
@@ -48,9 +49,27 @@ const FilterIcon = () => (
     </svg>
 );
 
+// Debounce hook
+const useDebounce = (value: string, delay: number) => {
+    const [debouncedValue, setDebouncedValue] = useState(value);
+
+    useEffect(() => {
+        const handler = setTimeout(() => {
+            setDebouncedValue(value);
+        }, delay);
+
+        return () => {
+            clearTimeout(handler);
+        };
+    }, [value, delay]);
+
+    return debouncedValue;
+};
+
 const Influencers: React.FC = () => {
     const dispatch = useDispatch();
     const creators = useSelector((state: any) => state.creators);
+    const locations = useSelector((state: any) => state.locationsRed);
     const navigate = useNavigate();
     const location = useLocation() as any;  
     const [searchQuery, setSearchQuery] = useState('');
@@ -77,10 +96,70 @@ const Influencers: React.FC = () => {
         status: 'All' // Kept status for compatibility with existing logical flow
     });
 
+    // Location filter states (for dropdowns)
+    const [countryId, setCountryId] = useState('');
+    const [stateId, setStateId] = useState('');
+    const [cityId, setCityId] = useState('');
+    
+    // Debounced location filters for API calls
+    const debouncedCountry = useDebounce(filters.country, 500);
+    const debouncedState = useDebounce(filters.state, 500);
+    const debouncedCity = useDebounce(filters.city, 500);
+
     const handleFilterChange = (key: string, value: string) => {
         setFilters(prev => ({ ...prev, [key]: value }));
         setCurrentPage(1);
     };
+
+    const handleCountryChange = (countryId: string) => {
+        setCountryId(countryId);
+        // Find country name from the list
+        const country = locations?.countries?.countries?.find((c: any) => c._id === countryId);
+        handleFilterChange('country', country?.name || '');
+        // Reset state and city when country changes
+        setStateId('');
+        handleFilterChange('state', '');
+        handleFilterChange('city', '');
+    };
+
+    const handleStateChange = (stateId: string) => {
+        setStateId(stateId);
+        // Find state name from the list
+        const state = locations?.states?.country?.states?.find((s: any) => s._id === stateId);
+        handleFilterChange('state', state?.name || '');
+        // Reset city when state changes
+        handleFilterChange('city', '');
+    };
+
+    const handleCityChange = (selectedCityId: string) => {
+        setCityId(selectedCityId);
+        // Find city name from the list
+        const city = locations?.cities?.country?.state?.cities?.find((c: any) => c._id === selectedCityId);
+        handleFilterChange('city', city?.name || '');
+    };
+
+    // Load countries on mount
+    useEffect(() => {
+        dispatch(getCountries(1, true, () => {}) as unknown as any);
+    }, [dispatch]);
+
+    // Load states when country is selected
+    useEffect(() => {
+        if (countryId) {
+            dispatch(getStates(countryId, 1, true, () => {}) as unknown as any);
+        } else {
+            dispatch({ type: 'GET_STATES', payload: null });
+        }
+    }, [countryId, dispatch]);
+
+    // Load cities when state is selected
+    useEffect(() => {
+        if (stateId && countryId) {
+            dispatch(getCities(countryId, stateId, 1, true, () => {}) as unknown as any);
+        } else {
+            dispatch({ type: 'GET_CITIES', payload: null });
+        }
+    }, [stateId, countryId, dispatch]);
 
     const clearFilters = () => {
         setFilters({
@@ -95,6 +174,9 @@ const Influencers: React.FC = () => {
             gender: '',
             status: 'All'
         });
+        setCountryId('');
+        setStateId('');
+        setCityId('');
         setSearchQuery('');
         setCurrentPage(1);
     };
@@ -167,9 +249,9 @@ const Influencers: React.FC = () => {
             filters.is_profile_completed, 
             filters.is_approved_by_admin, 
             filters.is_featured, 
-            filters.country, 
-            filters.state, 
-            filters.city, 
+            debouncedCountry, 
+            debouncedState, 
+            debouncedCity, 
             filters.gender, 
             (success: boolean) => {
                 setIsLoading(false);
@@ -184,9 +266,9 @@ const Influencers: React.FC = () => {
         filters.is_profile_completed, 
         filters.is_approved_by_admin, 
         filters.is_featured, 
-        filters.country, 
-        filters.state, 
-        filters.city, 
+        debouncedCountry, 
+        debouncedState, 
+        debouncedCity, 
         filters.gender
     ]);
     
@@ -343,36 +425,53 @@ const Influencers: React.FC = () => {
                         </div>
                     ))}
 
-                    {/* Location Inputs */}
+                    {/* Location Dropdowns */}
                     <div>
                          <label className="block mb-1 text-xs font-medium text-gray-700 dark:text-gray-300">Country</label>
-                         <input 
-                            type="text" 
-                            placeholder="Country"
-                            value={filters.country} 
-                            onChange={(e) => handleFilterChange('country', e.target.value)}
+                         <select
+                            value={countryId}
+                            onChange={(e) => handleCountryChange(e.target.value)}
                             className="w-full p-2 text-sm border rounded-md dark:bg-dark-700 dark:border-gray-600 dark:text-white"
-                        />
+                        >
+                            <option value="">All Countries</option>
+                            {locations?.countries?.countries?.map((country: any) => (
+                                <option key={country._id} value={country._id}>
+                                    {country.name}
+                                </option>
+                            ))}
+                        </select>
                     </div>
                     <div>
                          <label className="block mb-1 text-xs font-medium text-gray-700 dark:text-gray-300">State</label>
-                         <input 
-                            type="text" 
-                            placeholder="State"
-                            value={filters.state} 
-                            onChange={(e) => handleFilterChange('state', e.target.value)}
-                            className="w-full p-2 text-sm border rounded-md dark:bg-dark-700 dark:border-gray-600 dark:text-white"
-                        />
+                         <select
+                            value={stateId}
+                            onChange={(e) => handleStateChange(e.target.value)}
+                            disabled={!countryId}
+                            className="w-full p-2 text-sm border rounded-md dark:bg-dark-700 dark:border-gray-600 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <option value="">All States</option>
+                            {locations?.states?.country?.states?.map((state: any) => (
+                                <option key={state._id} value={state._id}>
+                                    {state.name}
+                                </option>
+                            ))}
+                        </select>
                     </div>
                      <div>
                          <label className="block mb-1 text-xs font-medium text-gray-700 dark:text-gray-300">City</label>
-                         <input 
-                            type="text" 
-                            placeholder="City"
-                            value={filters.city} 
-                            onChange={(e) => handleFilterChange('city', e.target.value)}
-                            className="w-full p-2 text-sm border rounded-md dark:bg-dark-700 dark:border-gray-600 dark:text-white"
-                        />
+                         <select
+                            value={cityId}
+                            onChange={(e) => handleCityChange(e.target.value)}
+                            disabled={!stateId}
+                            className="w-full p-2 text-sm border rounded-md dark:bg-dark-700 dark:border-gray-600 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <option value="">All Cities</option>
+                            {locations?.cities?.country?.state?.cities?.map((city: any) => (
+                                <option key={city._id} value={city._id}>
+                                    {city.name}
+                                </option>
+                            ))}
+                        </select>
                     </div>
                 </div>
                 <div className="flex justify-end mt-4">

@@ -1,6 +1,7 @@
 import { combineReducers } from "redux";
 import user from "./reducers/user"
 import creators from "./reducers/creators"
+import brands from "./reducers/brands"
 import influencerStats from "./reducers/influencerStats"
 import locationsRed from "./reducers/locationsRed"
 // import localFields from "./users/reducers/userlocal"
@@ -14,6 +15,7 @@ import locationsRed from "./reducers/locationsRed"
 export default combineReducers({
     user,
     creators,
+    brands,
     influencerStats,
     locationsRed,
     // localFields,

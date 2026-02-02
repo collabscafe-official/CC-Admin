@@ -1,6 +1,7 @@
 export const LOGIN = "LOGIN"
 export const LOGOUT = "LOGOUT"
 export const GET_CREATORS = "GET_CREATORS"
+export const GET_BRANDS = "GET_BRANDS"
 export const GET_INFLUENCER_STATS = "GET_INFLUENCER_STATS"
 export const GET_COUNTRIES = "GET_COUNTRIES"
 export const GET_STATES = "GET_STATES"

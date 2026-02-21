@@ -10,6 +10,7 @@ const Dashboard = lazy(() => import('./src/components/Dashboard'));
 const Influencers = lazy(() => import('./src/components/Influencers'));
 const InfluencerDetail = lazy(() => import('./src/components/InfluencerDetail'));
 const Brands = lazy(() => import('./src/components/Brands'));
+const BrandDetail = lazy(() => import('./src/components/BrandDetail'));
 const LoginPage = lazy(() => import('./src/components/LoginPage'));
 
 const App: React.FC = () => {
@@ -73,6 +74,7 @@ const Main: React.FC = () => {
                     <Route path="/influencers" element={<Influencers />} />
                     <Route path="/influencers/:id" element={<InfluencerDetail />} />
                     <Route path="/brands" element={<Brands />} />
+                    <Route path="/brands/:id" element={<BrandDetail />} />
                     <Route path="/login" element={<Navigate to="/dashboard" replace />} />
                     <Route path="/" element={<Navigate to="/dashboard" replace />} />
                     <Route path="*" element={<Navigate to="/dashboard" replace />} />

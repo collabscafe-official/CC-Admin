@@ -274,8 +274,15 @@ const Insights: React.FC = () => {
   const demographics = useMemo(() => {
     const countries       = topN(infList.map(i => i.country), 8);
     const cities          = topN(infList.map(i => i.city), 8);
-    const genders         = topN(infList.map(i => capitalize(i.gender)), 5);
-    const niches          = topN(infList.map(i => i.niche), 8);
+    const genders         = topN(
+      infList.map(i => {
+        const g = i.gender;
+        if (g === null || g === undefined || String(g).trim() === '') return 'Not Set';
+        return capitalize(String(g));
+      }),
+      6
+    );
+    const niches          = topN(infList.flatMap(i => Array.isArray(i.niches) ? i.niches.map((n: any) => n?.name) : []), 8);
     const uniqueCountries = new Set(infList.map(i => i.country).filter(Boolean)).size;
     const uniqueCities    = new Set(infList.map(i => i.city).filter(Boolean)).size;
     const total           = infList.length;
@@ -519,7 +526,7 @@ const Insights: React.FC = () => {
                           <Pie
                             data={demographics.genders} dataKey="count" nameKey="name"
                             cx="50%" cy="50%" outerRadius={88}
-                            label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                            label={({ name, percent }) => `${name} ${(percent * 100).toFixed(1)}%`}
                             labelLine={false}
                           >
                             {demographics.genders.map((_, i) => (

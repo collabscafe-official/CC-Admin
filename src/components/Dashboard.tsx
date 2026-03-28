@@ -25,14 +25,17 @@ const STYLES = `
   @media (min-width: 1024px) {
     .dash-stat-grid { grid-template-columns: repeat(5, 1fr); }
   }
-  /* action grid: 1-col default, 3-col at 640px */
+  /* action grid: 1-col default, 2-col at 640px, 4-col at 1024px */
   .dash-action-grid {
     display: grid;
     grid-template-columns: 1fr;
     gap: 12px;
   }
   @media (min-width: 640px) {
-    .dash-action-grid { grid-template-columns: repeat(3, 1fr); }
+    .dash-action-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (min-width: 1024px) {
+    .dash-action-grid { grid-template-columns: repeat(4, 1fr); }
   }
   /* banner: stack on narrow, row at 480px */
   .dash-banner {
@@ -527,6 +530,18 @@ const Dashboard: React.FC = () => {
                 title="Featured Creators"
                 subtitle="Coming soon"
                 disabled
+              />
+              <QuickActionCard
+                icon={(
+                  <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                      d="M16 8v8m-4-5v5m-4-2v2m-2 4h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                )}
+                iconColor="#06b6d4"
+                title="Insights"
+                subtitle="Platform analytics & trends"
+                onClick={() => navigate('/insights')}
               />
             </div>
           </div>

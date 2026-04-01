@@ -2,8 +2,8 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 // ── API config ────────────────────────────────────────────────────────────────
-const EMAIL_SERVICE_URL = 'http://localhost:4000';
-const EMAIL_API_KEY = 'cc-email-admin-2026';
+const EMAIL_SERVICE_URL = 'https://emailapi.collabscafe.com';
+const EMAIL_API_KEY = 'FHsbN6M6xc8g';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Campaign {

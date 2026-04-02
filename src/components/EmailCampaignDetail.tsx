@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import EMAIL_CONFIG from '../config/emailService';
 
-// ── API config (mirrors EmailCampaigns.tsx) ───────────────────────────────────
-const EMAIL_SERVICE_URL = 'https://emailapi.collabscafe.com';
-const EMAIL_API_KEY = 'FHsbN6M6xc8g';
+// ── API config ────────────────────────────────────────────────────────────────
+const EMAIL_SERVICE_URL = EMAIL_CONFIG.BASE_URL;
+const EMAIL_API_KEY = EMAIL_CONFIG.API_KEY;
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Campaign {
@@ -12,10 +13,11 @@ interface Campaign {
   templateType: string;
   subject: string;
   customBody?: string;
-  status: 'draft' | 'running' | 'paused' | 'completed' | 'failed';
+  status: 'draft' | 'running' | 'paused' | 'completed' | 'failed' | 'cancelled';
   totalTargeted: number;
   sentCount: number;
   failedCount: number;
+  ratePerHour?: number;
   startedAt?: string;
   completedAt?: string;
   createdAt: string;
@@ -203,6 +205,43 @@ export default function EmailCampaignDetail() {
   const [activeTab, setActiveTab] = useState<LogTab>('all');
 
   const isRunningRef = useRef(false);
+  const [remainingMs, setRemainingMs] = useState<number | null>(null);
+  const lastSendTimestampRef = useRef<number | null>(null);
+  const prevSentCountRef = useRef<number>(0);
+
+  // Single persistent tick — mounted once, never restarts
+  useEffect(() => {
+    const tick = setInterval(() => {
+      setRemainingMs((prev: number | null) => prev !== null && prev > 1000 ? prev - 1000 : null);
+    }, 1000);
+    return () => clearInterval(tick);
+  }, []);
+
+  // Recalculate from actual last-send timestamp whenever campaign data arrives
+  useEffect(() => {
+    if (!campaign || campaign.status !== 'running') {
+      setRemainingMs(null);
+      return;
+    }
+    const pendingCount = Math.max(0, campaign.totalTargeted - campaign.sentCount - campaign.failedCount);
+    if (pendingCount <= 0) { setRemainingMs(null); return; }
+
+    const rate = campaign.ratePerHour && campaign.ratePerHour > 0 ? campaign.ratePerHour : 100;
+    const intervalMs = Math.floor(3_600_000 / rate);
+
+    // If sentCount grew since last poll, a new email just went out — anchor now
+    if (campaign.sentCount > prevSentCountRef.current) {
+      lastSendTimestampRef.current = Date.now();
+    }
+    prevSentCountRef.current = campaign.sentCount;
+
+    const elapsed = lastSendTimestampRef.current !== null
+      ? Date.now() - lastSendTimestampRef.current
+      : 0;
+    const timeUntilNext = Math.max(0, intervalMs - elapsed);
+
+    setRemainingMs(timeUntilNext + (pendingCount - 1) * intervalMs);
+  }, [campaign]);
 
   // ── Fetch campaign ───────────────────────────────────────────────────────────
   const fetchCampaign = useCallback(async () => {
@@ -232,6 +271,15 @@ export default function EmailCampaignDetail() {
       const data = await res.json();
       setLogs(data.logs || []);
       setLogsTotal(data.total || 0);
+
+      // Anchor lastSendTimestamp from the most recent sent log
+      const sentTs = (data.logs as EmailLog[])
+        .filter((l: EmailLog) => l.sentAt)
+        .map((l: EmailLog) => new Date(l.sentAt!).getTime())
+        .reduce((max: number, t: number) => (t > max ? t : max), 0);
+      if (sentTs > 0 && (lastSendTimestampRef.current === null || sentTs > lastSendTimestampRef.current)) {
+        lastSendTimestampRef.current = sentTs;
+      }
     } catch (_) {
       // silently keep stale data on poll failures
     } finally {
@@ -278,14 +326,14 @@ export default function EmailCampaignDetail() {
     : 0;
 
   const estRemaining = (() => {
-    if (!campaign || campaign.status !== 'running') return null;
-    const remaining = campaign.totalTargeted - campaign.sentCount;
-    if (remaining <= 0) return null;
-    const rate = 100; // default — stored in queue config
-    const hours = remaining / rate;
-    return hours >= 1
-      ? `~${Math.ceil(hours)} hours remaining`
-      : `~${Math.ceil(hours * 60)} minutes remaining`;
+    if (remainingMs === null) return null;
+    const totalSec = Math.ceil(remainingMs / 1000);
+    const h = Math.floor(totalSec / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
+    const s = totalSec % 60;
+    if (h > 0) return `~${h}h ${m}m remaining`;
+    if (m > 0) return `~${m}m ${s}s remaining`;
+    return `~${s}s remaining`;
   })();
 
   // ── Loading / Error ──────────────────────────────────────────────────────────

@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import EMAIL_CONFIG from '../config/emailService';
 
 // ── API config ────────────────────────────────────────────────────────────────
-const EMAIL_SERVICE_URL = 'https://emailapi.collabscafe.com';
-const EMAIL_API_KEY = 'FHsbN6M6xc8g';
+const EMAIL_SERVICE_URL = EMAIL_CONFIG.BASE_URL;
+const EMAIL_API_KEY = EMAIL_CONFIG.API_KEY;
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Campaign {
@@ -12,7 +13,7 @@ interface Campaign {
   templateType: string;
   subject: string;
   customBody?: string;
-  status: 'draft' | 'running' | 'paused' | 'completed' | 'failed';
+  status: 'draft' | 'running' | 'paused' | 'completed' | 'failed' | 'cancelled';
   totalTargeted: number;
   sentCount: number;
   failedCount: number;
@@ -195,8 +196,9 @@ const STATUS_META: Record<string, { label: string; color: string; pulse?: boolea
   draft:     { label: 'Draft',     color: '#6b7280' },
   running:   { label: 'Running',   color: '#3b82f6', pulse: true },
   paused:    { label: 'Paused',    color: '#f59e0b' },
-  completed: { label: 'Completed', color: '#10b981' },
-  failed:    { label: 'Failed',    color: '#ef4444' },
+  completed:  { label: 'Completed',  color: '#10b981' },
+  failed:     { label: 'Failed',     color: '#ef4444' },
+  cancelled:  { label: 'Cancelled',  color: '#6b7280' },
 };
 
 const INSERT_VARS = [
@@ -926,6 +928,7 @@ export default function EmailCampaigns() {
           customBody: htmlContent,
           targetFilters: buildTargetFilters(),
           excluded_ids: excludedIds,
+          rate_per_hour: ratePerHour,
         }),
       });
       if (!createRes.ok) {
@@ -954,8 +957,8 @@ export default function EmailCampaigns() {
 
   const handlePause = async (id: string) => {
     try {
-      const res = await fetch(`${EMAIL_SERVICE_URL}/campaigns/${id}`, {
-        method: 'PATCH', headers: apiHeaders(true), body: JSON.stringify({ status: 'paused' }),
+      const res = await fetch(`${EMAIL_SERVICE_URL}/campaigns/${id}/pause`, {
+        method: 'POST', headers: apiHeaders(),
       });
       if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Pause failed'); }
       fetchCampaigns();
@@ -964,10 +967,21 @@ export default function EmailCampaigns() {
 
   const handleResume = async (id: string) => {
     try {
-      const res = await fetch(`${EMAIL_SERVICE_URL}/campaigns/${id}`, {
-        method: 'PATCH', headers: apiHeaders(true), body: JSON.stringify({ status: 'running' }),
+      const res = await fetch(`${EMAIL_SERVICE_URL}/campaigns/${id}/resume`, {
+        method: 'POST', headers: apiHeaders(),
       });
       if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Resume failed'); }
+      fetchCampaigns();
+    } catch (e: any) { showToast(e.message, false); }
+  };
+
+  const handleStop = async (id: string) => {
+    if (!window.confirm('Stop this campaign? All pending emails will be cancelled.')) return;
+    try {
+      const res = await fetch(`${EMAIL_SERVICE_URL}/campaigns/${id}/stop`, {
+        method: 'POST', headers: apiHeaders(),
+      });
+      if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Stop failed'); }
       fetchCampaigns();
     } catch (e: any) { showToast(e.message, false); }
   };
@@ -995,9 +1009,11 @@ export default function EmailCampaigns() {
 
   // ── Derived ──────────────────────────────────────────────────────────────────
   const canPreview   = !!campaignType && !previewLoading;
-  const canSend      = !!campaignType && !!campaignName.trim() && !!subject.trim() && !!htmlContent.trim() && previewRan && !sending;
   const recipientCount = previewResult?.count ?? 0;
   const selectedCount  = Math.max(0, recipientCount - excludedIds.length);
+  // Block send if the full list couldn't load — exclusions would silently not apply
+  const exclusionsSafe = !previewSampleOnly && (previewTotalPages <= 1 || previewCreators.length >= recipientCount);
+  const canSend      = !!campaignType && !!campaignName.trim() && !!subject.trim() && !!htmlContent.trim() && previewRan && !sending && (excludedIds.length === 0 || exclusionsSafe);
   const estHours     = ratePerHour > 0 ? recipientCount / ratePerHour : 0;
   const estLabel     = recipientCount === 0 ? 'Run preview first'
     : estHours >= 1 ? `~${Math.ceil(estHours)} hours to complete`
@@ -1198,28 +1214,33 @@ export default function EmailCampaigns() {
                             <span style={{ fontWeight: 600 }}>{recipientCount.toLocaleString()}</span>
                             {' '}creators selected
                           </span>
-                          <div style={{ display: 'flex', gap: 12 }}>
-                            <button
-                              onClick={() => setExcludedIds([])}
-                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#4f46e5', fontSize: 13, padding: 0, fontWeight: 500 }}
-                            >
-                              Select All
-                            </button>
-                            <button
-                              onClick={() => setExcludedIds(previewCreators.map((c: any) => c._id).filter(Boolean))}
-                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#4f46e5', fontSize: 13, padding: 0, fontWeight: 500 }}
-                            >
-                              Deselect All
-                            </button>
-                          </div>
+                          {!previewSampleOnly && (
+                            <div style={{ display: 'flex', gap: 12 }}>
+                              <button
+                                onClick={() => setExcludedIds([])}
+                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#4f46e5', fontSize: 13, padding: 0, fontWeight: 500 }}
+                              >
+                                Select All
+                              </button>
+                              <button
+                                onClick={() => setExcludedIds(previewCreators.map((c: any) => c._id).filter(Boolean))}
+                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#4f46e5', fontSize: 13, padding: 0, fontWeight: 500 }}
+                              >
+                                Deselect All
+                              </button>
+                            </div>
+                          )}
                         </div>
 
                         {/* Body */}
                         {previewSampleOnly ? (
                           <div style={{ padding: '10px 14px' }}>
-                            <p style={{ margin: '0 0 10px', fontSize: 12, color: '#f59e0b' }}>
-                              Showing sample only — full list endpoint not available yet
-                            </p>
+                            <div style={{ padding: '10px 14px', background: 'rgba(239,68,68,0.08)', borderRadius: 6, border: '1px solid rgba(239,68,68,0.2)', marginBottom: 10 }}>
+                              <p style={{ margin: '0 0 4px', fontSize: 13, fontWeight: 600, color: '#ef4444' }}>⚠️ Cannot exclude individual recipients</p>
+                              <p style={{ margin: 0, fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>
+                                The full list could not be loaded. Sending will reach all {recipientCount.toLocaleString()} creators — individual exclusions are disabled. Deploy the email service update to enable this feature.
+                              </p>
+                            </div>
                             <table className="ec-recip-table">
                               <thead>
                                 <tr>
@@ -1337,6 +1358,16 @@ export default function EmailCampaigns() {
                   Run preview to enable send
                 </p>
               )}
+              {previewRan && excludedIds.length > 0 && !exclusionsSafe && (
+                <div style={{ margin: '8px 0 0', padding: '10px 14px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 8 }}>
+                  <p style={{ margin: '0 0 2px', fontSize: 13, fontWeight: 600, color: '#ef4444' }}>⚠️ Send blocked — exclusions can't be guaranteed</p>
+                  <p style={{ margin: 0, fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>
+                    {previewSampleOnly
+                      ? 'The full recipient list could not be loaded. Deploy the email service update, then re-run preview.'
+                      : `Only ${previewCreators.length} of ${recipientCount} creators are loaded — exclusions from other pages would be silently ignored.`}
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 
@@ -1386,6 +1417,7 @@ export default function EmailCampaigns() {
                         <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
                           {c.status === 'running'  && <button className="ec-btn ec-btn-amber"    style={{ padding: '5px 10px', fontSize: 12 }} onClick={() => handlePause(c._id)}>Pause</button>}
                           {c.status === 'paused'   && <button className="ec-btn ec-btn-secondary" style={{ padding: '5px 10px', fontSize: 12 }} onClick={() => handleResume(c._id)}>Resume</button>}
+                          {(c.status === 'running' || c.status === 'paused') && <button className="ec-btn" style={{ padding: '5px 10px', fontSize: 12, background: '#fee2e2', color: '#b91c1c', border: '1px solid #fca5a5' }} onClick={() => handleStop(c._id)}>Stop</button>}
                           {(c.status === 'completed' || c.status === 'failed') && (
                             <button className="ec-btn ec-btn-gray" style={{ padding: '5px 10px', fontSize: 12 }} onClick={() => navigate(`/email-campaigns/${c._id}`)}>View Logs</button>
                           )}

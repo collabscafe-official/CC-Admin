@@ -400,14 +400,15 @@ const Influencers: React.FC = () => {
   useEffect(() => {
     setIsLoading(true);
     dispatch(getCreators(
-      itemsPerPage, currentPage,
+      searchQuery ? 1000 : itemsPerPage,
+      searchQuery ? 1 : currentPage,
       filters.is_active, filters.is_email_verified, filters.is_profile_completed,
       filters.is_approved_by_admin, filters.is_featured,
       debouncedCountry, debouncedState, debouncedCity, filters.gender,
       (_success: boolean) => { setIsLoading(false); }
     ) as unknown as any);
   }, [
-    dispatch, itemsPerPage, currentPage,
+    dispatch, searchQuery, itemsPerPage, currentPage,
     filters.is_active, filters.is_email_verified, filters.is_profile_completed,
     filters.is_approved_by_admin, filters.is_featured,
     debouncedCountry, debouncedState, debouncedCity, filters.gender,
@@ -423,7 +424,10 @@ const Influencers: React.FC = () => {
     if (!creators?.profiles || !Array.isArray(creators.profiles)) return [];
     if (!searchQuery) return creators.profiles;
     const q = searchQuery.toLowerCase();
-    return creators.profiles.filter((inf: any) => inf.name?.toLowerCase().includes(q));
+    return creators.profiles.filter((inf: any) =>
+      inf.name?.toLowerCase().includes(q) ||
+      inf.email?.toLowerCase().includes(q)
+    );
   }, [creators?.profiles, searchQuery]);
 
   const totalCount = creators?.pagination?.total_count ?? 0;

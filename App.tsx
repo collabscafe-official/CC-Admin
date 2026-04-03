@@ -14,6 +14,8 @@ const BrandDetail = lazy(() => import('./src/components/BrandDetail'));
 const Insights = lazy(() => import('./src/components/Insights'));
 const EmailCampaigns = lazy(() => import('./src/components/EmailCampaigns'));
 const EmailCampaignDetail = lazy(() => import('./src/components/EmailCampaignDetail'));
+const CsvEmailCampaigns = lazy(() => import('./src/components/CsvEmailCampaigns'));
+const CsvEmailCampaignDetail = lazy(() => import('./src/components/CsvEmailCampaignDetail'));
 const LoginPage = lazy(() => import('./src/components/LoginPage'));
 
 const App: React.FC = () => {
@@ -41,7 +43,9 @@ const Main: React.FC = () => {
         ? 'Insights'
         : pathname.startsWith('/email-campaigns')
           ? 'Email Campaigns'
-          : 'Dashboard';
+          : pathname.startsWith('/csv-campaigns')
+            ? 'Bulk Email'
+            : 'Dashboard';
 
   const setActiveScreen = (screen: string) => {
     switch (screen) {
@@ -56,6 +60,9 @@ const Main: React.FC = () => {
         break;
       case 'Email Campaigns':
         navigate('/email-campaigns');
+        break;
+      case 'Bulk Email':
+        navigate('/csv-campaigns');
         break;
       case 'Dashboard':
       default:
@@ -91,6 +98,8 @@ const Main: React.FC = () => {
                     <Route path="/insights" element={<Insights />} />
                     <Route path="/email-campaigns" element={<EmailCampaigns />} />
                     <Route path="/email-campaigns/:id" element={<EmailCampaignDetail />} />
+                    <Route path="/csv-campaigns" element={<CsvEmailCampaigns />} />
+                    <Route path="/csv-campaigns/:id" element={<CsvEmailCampaignDetail />} />
                     <Route path="/login" element={<Navigate to="/dashboard" replace />} />
                     <Route path="/" element={<Navigate to="/dashboard" replace />} />
                     <Route path="*" element={<Navigate to="/dashboard" replace />} />

@@ -23,6 +23,7 @@ interface CsvCampaign {
 interface Recipient {
   name: string;
   email: string;
+  customFields?: Record<string, string>;
 }
 
 // ── Default template ──────────────────────────────────────────────────────────
@@ -74,7 +75,7 @@ const STATUS_META: Record<string, { label: string; color: string }> = {
   cancelled: { label: 'Cancelled', color: '#6b7280' },
 };
 
-const INSERT_VARS = [
+const BASE_VARS = [
   { key: '{{first_name}}', label: "Recipient's first name" },
   { key: '{{name}}',       label: "Recipient's full name" },
   { key: '{{email}}',      label: "Recipient's email" },
@@ -396,6 +397,7 @@ export default function CsvEmailCampaigns() {
   const [uploadError, setUploadError]     = useState('');
   const [recipients, setRecipients]       = useState<Recipient[]>([]);
   const [parseErrors, setParseErrors]     = useState<string[]>([]);
+  const [extraColumns, setExtraColumns]   = useState<string[]>([]);
   const [isDragging, setIsDragging]       = useState(false);
   const [recipPage, setRecipPage]         = useState(1);
   const RECIP_PAGE_SIZE = 8;
@@ -539,6 +541,7 @@ export default function CsvEmailCampaigns() {
       }
       setRecipients(data.recipients || []);
       setParseErrors(data.errors || []);
+      setExtraColumns(data.columns || []);
       if ((data.recipients || []).length === 0) {
         setUploadError('No valid recipients found. Make sure the file has "name" and "email" columns.');
       }
@@ -650,6 +653,7 @@ export default function CsvEmailCampaigns() {
       setTemplateSaved(false);
       setRecipients([]);
       setParseErrors([]);
+      setExtraColumns([]);
       setUploadError('');
       setView('list');
       loadCampaigns();
@@ -900,16 +904,18 @@ export default function CsvEmailCampaigns() {
                       <span style={{ fontSize: 13, fontWeight: 600, color: 'white' }}>
                         {recipients.length} recipient{recipients.length !== 1 ? 's' : ''} found
                       </span>
-                      <button className="cc-btn cc-btn-gray" style={{ padding: '4px 10px', fontSize: 11 }} onClick={() => { setRecipients([]); setParseErrors([]); setUploadError(''); }}>
+                      <button className="cc-btn cc-btn-gray" style={{ padding: '4px 10px', fontSize: 11 }} onClick={() => { setRecipients([]); setParseErrors([]); setExtraColumns([]); setUploadError(''); }}>
                         Clear
                       </button>
                     </div>
+                    <div style={{ overflowX: 'auto' }}>
                     <table className="cc-recip-table">
                       <thead>
                         <tr>
                           <th>#</th>
                           <th>Name</th>
                           <th>Email</th>
+                          {extraColumns.map((col: string) => <th key={col}>{col}</th>)}
                         </tr>
                       </thead>
                       <tbody>
@@ -918,10 +924,16 @@ export default function CsvEmailCampaigns() {
                             <td style={{ color: 'rgba(255,255,255,0.3)', fontSize: 11 }}>{(recipPage - 1) * RECIP_PAGE_SIZE + i + 1}</td>
                             <td>{r.name || <span style={{ color: 'rgba(255,255,255,0.3)' }}>—</span>}</td>
                             <td style={{ color: 'rgba(255,255,255,0.6)' }}>{r.email}</td>
+                            {extraColumns.map((col: string) => (
+                              <td key={col} style={{ color: 'rgba(255,255,255,0.55)' }}>
+                                {r.customFields?.[col] || <span style={{ color: 'rgba(255,255,255,0.2)' }}>—</span>}
+                              </td>
+                            ))}
                           </tr>
                         ))}
                       </tbody>
                     </table>
+                    </div>
                     {recipTotalPages > 1 && (
                       <div className="cc-recip-pager">
                         <button className="cc-btn cc-btn-gray" style={{ padding: '3px 10px', fontSize: 12 }} disabled={recipPage === 1} onClick={() => setRecipPage(p => p - 1)}>‹</button>
@@ -1087,7 +1099,7 @@ export default function CsvEmailCampaigns() {
                   </button>
                   {varDropdownOpen && (
                     <div className="cc-var-dropdown">
-                      {INSERT_VARS.map((v) => (
+                      {[...BASE_VARS, ...extraColumns.map((c: string) => ({ key: `{{${c}}}`, label: c }))].map((v) => (
                         <button key={v.key} className="cc-var-item" onClick={() => insertVar(v.key)}>
                           <span style={{ fontSize: 12, color: '#818cf8', fontFamily: 'monospace' }}>{v.key}</span>
                           <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>{copiedVar === v.key ? '✓ inserted' : v.label}</span>

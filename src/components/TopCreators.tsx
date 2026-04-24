@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ANALYTICS_CONFIG from '../config/analyticsService';
+import Ga4QuotaAlert from './Ga4QuotaAlert';
 
 const BASE = ANALYTICS_CONFIG.BASE_URL;
 const API_KEY = ANALYTICS_CONFIG.API_KEY;
@@ -9,7 +10,7 @@ const apiHeaders = (): Record<string, string> => ({
   'Content-Type': 'application/json',
 });
 
-type SortKey = 'views' | 'clicks' | 'favorites' | 'followers' | 'score';
+type SortKey = 'visits' | 'clicks' | 'favorites' | 'followers' | 'score';
 type DayRange = '30' | '60' | '90' | 'all';
 
 interface Creator {
@@ -25,7 +26,7 @@ interface Creator {
 interface TopCreatorItem {
   rank: number;
   creator: Creator | null;
-  impressions: number;
+  profileVisits: number;
   clicks: number;
   favoritesCount: number;
   totalFollowers: number;
@@ -41,6 +42,7 @@ interface ApiResponse {
   limit: number;
   sort: string;
   days: string;
+  visitsLastUpdated?: string | null;
 }
 
 function fmtNumber(n?: number): string {
@@ -48,6 +50,18 @@ function fmtNumber(n?: number): string {
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
   if (n >= 1_000) return (n / 1_000).toFixed(1) + 'K';
   return n.toLocaleString();
+}
+
+function fmtTimeAgo(iso?: string | null): string {
+  if (!iso) return 'never';
+  const ms = Date.now() - new Date(iso).getTime();
+  const min = Math.floor(ms / 60_000);
+  if (min < 1) return 'just now';
+  if (min < 60) return `${min} min ago`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr} hour${hr === 1 ? '' : 's'} ago`;
+  const d = Math.floor(hr / 24);
+  return `${d} day${d === 1 ? '' : 's'} ago`;
 }
 
 function platformIcon(p: string): string {
@@ -66,13 +80,15 @@ function platformColor(p: string): string {
   return 'text-gray-400';
 }
 
-const SORT_TABS: { key: SortKey; label: string; description: string }[] = [
-  { key: 'views', label: 'Profile Views', description: 'By total profile impressions' },
-  { key: 'clicks', label: 'Profile Clicks', description: 'By clicks to creator profile' },
+const SORT_TABS: { key: SortKey; label: string; description: string; ga4?: boolean }[] = [
+  { key: 'visits', label: 'Profile Visits', description: 'Total profile visits (from Google Analytics) — Collabscafe + search + direct + social shares', ga4: true },
+  { key: 'clicks', label: 'Profile Clicks', description: 'Clicks to the creator profile from within Collabscafe' },
   { key: 'favorites', label: 'Favorites', description: 'Most favorited by brands' },
   { key: 'followers', label: 'Followers', description: 'Total followers across platforms' },
   { key: 'score', label: 'Trust Score', description: 'Highest audience quality' },
 ];
+
+const GA4_TOOLTIP = 'Profile visits tracked by Google Analytics — includes traffic from Collabscafe, search engines, direct links, and social shares.';
 
 const DAY_RANGES: { key: DayRange; label: string }[] = [
   { key: '30', label: 'Last 30 days' },
@@ -86,7 +102,7 @@ const TopCreators: React.FC = () => {
   const [data, setData] = useState<ApiResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [sort, setSort] = useState<SortKey>('views');
+  const [sort, setSort] = useState<SortKey>('visits');
   const [days, setDays] = useState<DayRange>('30');
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -142,6 +158,8 @@ const TopCreators: React.FC = () => {
         </p>
       </div>
 
+      <Ga4QuotaAlert />
+
       {/* Controls */}
       <div className="bg-dark-800 border border-dark-700 rounded-xl p-4 mb-6">
         <div className="flex flex-wrap gap-4 items-start justify-between">
@@ -153,13 +171,16 @@ const TopCreators: React.FC = () => {
                 <button
                   key={tab.key}
                   onClick={() => { setSort(tab.key); setPage(1); }}
-                  className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${
+                  className={`px-3 py-1.5 rounded text-xs font-medium transition-colors inline-flex items-center gap-1.5 ${
                     sort === tab.key
                       ? 'bg-gradient-to-r from-primary to-primary-accent text-white shadow'
                       : 'text-gray-400 hover:text-white hover:bg-dark-700'
                   }`}
                 >
                   {tab.label}
+                  {tab.ga4 && (
+                    <i className="fas fa-info-circle text-[10px] opacity-70" title={GA4_TOOLTIP} />
+                  )}
                 </button>
               ))}
             </div>
@@ -198,9 +219,23 @@ const TopCreators: React.FC = () => {
           </div>
         </div>
 
-        <p className="text-xs text-gray-500 mt-3">
-          {activeSortTab.description} · {data?.days === 'all' ? 'All time' : `Last ${data?.days || days} days`}
-        </p>
+        <div className="flex flex-wrap items-center gap-2 mt-3 text-xs text-gray-500">
+          <span>
+            {activeSortTab.description} · {data?.days === 'all' ? 'All time' : `Last ${data?.days || days} days`}
+          </span>
+          {data?.visitsLastUpdated !== undefined && (
+            <>
+              <span className="text-gray-700">·</span>
+              <span
+                title={data.visitsLastUpdated ? new Date(data.visitsLastUpdated).toLocaleString() : 'Cache is still warming up'}
+                className="inline-flex items-center gap-1"
+              >
+                <i className="fas fa-sync-alt text-[10px] opacity-60" />
+                Visits data updated {fmtTimeAgo(data.visitsLastUpdated)}
+              </span>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Error state */}
@@ -218,7 +253,12 @@ const TopCreators: React.FC = () => {
               <tr className="text-gray-400 uppercase text-xs">
                 <th className="px-4 py-3 text-left font-semibold w-12">#</th>
                 <th className="px-4 py-3 text-left font-semibold">Creator</th>
-                <th className="px-4 py-3 text-right font-semibold">Views</th>
+                <th className="px-4 py-3 text-right font-semibold">
+                  <span className="inline-flex items-center gap-1 justify-end">
+                    Visits
+                    <i className="fas fa-info-circle text-[10px] opacity-60" title={GA4_TOOLTIP} />
+                  </span>
+                </th>
                 <th className="px-4 py-3 text-right font-semibold">Clicks</th>
                 <th className="px-4 py-3 text-right font-semibold">Favorites</th>
                 <th className="px-4 py-3 text-right font-semibold">Followers</th>
@@ -280,8 +320,8 @@ const TopCreators: React.FC = () => {
                         </div>
                       </div>
                     </td>
-                    <td className={`px-4 py-3 text-right ${sort === 'views' ? 'font-bold text-primary-accent' : 'text-gray-300'}`}>
-                      {fmtNumber(item.impressions)}
+                    <td className={`px-4 py-3 text-right ${sort === 'visits' ? 'font-bold text-primary-accent' : 'text-gray-300'}`}>
+                      {fmtNumber(item.profileVisits)}
                     </td>
                     <td className={`px-4 py-3 text-right ${sort === 'clicks' ? 'font-bold text-primary-accent' : 'text-gray-300'}`}>
                       {fmtNumber(item.clicks)}

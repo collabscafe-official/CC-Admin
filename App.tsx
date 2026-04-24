@@ -12,6 +12,7 @@ const InfluencerDetail = lazy(() => import('./src/components/InfluencerDetail'))
 const Brands = lazy(() => import('./src/components/Brands'));
 const BrandDetail = lazy(() => import('./src/components/BrandDetail'));
 const Insights = lazy(() => import('./src/components/Insights'));
+const TopCreators = lazy(() => import('./src/components/TopCreators'));
 const EmailCampaigns = lazy(() => import('./src/components/EmailCampaigns'));
 const EmailCampaignDetail = lazy(() => import('./src/components/EmailCampaignDetail'));
 const CsvEmailCampaigns = lazy(() => import('./src/components/CsvEmailCampaigns'));
@@ -40,15 +41,17 @@ const Main: React.FC = () => {
     ? 'Influencers'
     : pathname.startsWith('/brands')
       ? 'Brands'
-      : pathname.startsWith('/insights')
-        ? 'Insights'
-        : pathname.startsWith('/email-campaigns')
-          ? 'Email Campaigns'
-          : pathname.startsWith('/csv-campaigns')
-            ? 'Bulk Email'
-            : pathname.startsWith('/social-sync')
-              ? 'Social Sync'
-              : 'Dashboard';
+      : pathname.startsWith('/top-creators')
+        ? 'Top Creators'
+        : pathname.startsWith('/insights')
+          ? 'Insights'
+          : pathname.startsWith('/email-campaigns')
+            ? 'Email Campaigns'
+            : pathname.startsWith('/csv-campaigns')
+              ? 'Bulk Email'
+              : pathname.startsWith('/social-sync')
+                ? 'Social Sync'
+                : 'Dashboard';
 
   const setActiveScreen = (screen: string) => {
     switch (screen) {
@@ -60,6 +63,9 @@ const Main: React.FC = () => {
         break;
       case 'Insights':
         navigate('/insights');
+        break;
+      case 'Top Creators':
+        navigate('/top-creators');
         break;
       case 'Email Campaigns':
         navigate('/email-campaigns');
@@ -102,6 +108,7 @@ const Main: React.FC = () => {
                     <Route path="/brands" element={<Brands />} />
                     <Route path="/brands/:id" element={<BrandDetail />} />
                     <Route path="/insights" element={<Insights />} />
+                    <Route path="/top-creators" element={<TopCreators />} />
                     <Route path="/email-campaigns" element={<EmailCampaigns />} />
                     <Route path="/email-campaigns/:id" element={<EmailCampaignDetail />} />
                     <Route path="/csv-campaigns" element={<CsvEmailCampaigns />} />

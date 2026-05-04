@@ -18,6 +18,8 @@ const EmailCampaignDetail = lazy(() => import('./src/components/EmailCampaignDet
 const CsvEmailCampaigns = lazy(() => import('./src/components/CsvEmailCampaigns'));
 const CsvEmailCampaignDetail = lazy(() => import('./src/components/CsvEmailCampaignDetail'));
 const SocialSyncStatus = lazy(() => import('./src/components/SocialSyncStatus'));
+const BrandActivity = lazy(() => import('./src/components/BrandActivity'));
+const BrandActivityDetail = lazy(() => import('./src/components/BrandActivityDetail'));
 const LoginPage = lazy(() => import('./src/components/LoginPage'));
 
 const App: React.FC = () => {
@@ -39,19 +41,21 @@ const Main: React.FC = () => {
   const pathname = location.pathname;
   const activeScreen = pathname.startsWith('/influencers')
     ? 'Influencers'
-    : pathname.startsWith('/brands')
-      ? 'Brands'
-      : pathname.startsWith('/top-creators')
-        ? 'Top Creators'
-        : pathname.startsWith('/insights')
-          ? 'Insights'
-          : pathname.startsWith('/email-campaigns')
-            ? 'Email Campaigns'
-            : pathname.startsWith('/csv-campaigns')
-              ? 'Bulk Email'
-              : pathname.startsWith('/social-sync')
-                ? 'Social Sync'
-                : 'Dashboard';
+    : pathname.startsWith('/brand-activity')
+      ? 'Brand Activity'
+      : pathname.startsWith('/brands')
+        ? 'Brands'
+        : pathname.startsWith('/top-creators')
+          ? 'Top Creators'
+          : pathname.startsWith('/insights')
+            ? 'Insights'
+            : pathname.startsWith('/email-campaigns')
+              ? 'Email Campaigns'
+              : pathname.startsWith('/csv-campaigns')
+                ? 'Bulk Email'
+                : pathname.startsWith('/social-sync')
+                  ? 'Social Sync'
+                  : 'Dashboard';
 
   const setActiveScreen = (screen: string) => {
     switch (screen) {
@@ -75,6 +79,9 @@ const Main: React.FC = () => {
         break;
       case 'Social Sync':
         navigate('/social-sync');
+        break;
+      case 'Brand Activity':
+        navigate('/brand-activity');
         break;
       case 'Dashboard':
       default:
@@ -114,6 +121,8 @@ const Main: React.FC = () => {
                     <Route path="/csv-campaigns" element={<CsvEmailCampaigns />} />
                     <Route path="/csv-campaigns/:id" element={<CsvEmailCampaignDetail />} />
                     <Route path="/social-sync" element={<SocialSyncStatus />} />
+                    <Route path="/brand-activity" element={<BrandActivity />} />
+                    <Route path="/brand-activity/:brandId" element={<BrandActivityDetail />} />
                     <Route path="/login" element={<Navigate to="/dashboard" replace />} />
                     <Route path="/" element={<Navigate to="/dashboard" replace />} />
                     <Route path="*" element={<Navigate to="/dashboard" replace />} />

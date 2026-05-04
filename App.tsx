@@ -20,6 +20,7 @@ const CsvEmailCampaignDetail = lazy(() => import('./src/components/CsvEmailCampa
 const SocialSyncStatus = lazy(() => import('./src/components/SocialSyncStatus'));
 const BrandActivity = lazy(() => import('./src/components/BrandActivity'));
 const BrandActivityDetail = lazy(() => import('./src/components/BrandActivityDetail'));
+const BrandActivitySearches = lazy(() => import('./src/components/BrandActivitySearches'));
 const LoginPage = lazy(() => import('./src/components/LoginPage'));
 
 const App: React.FC = () => {
@@ -122,6 +123,7 @@ const Main: React.FC = () => {
                     <Route path="/csv-campaigns/:id" element={<CsvEmailCampaignDetail />} />
                     <Route path="/social-sync" element={<SocialSyncStatus />} />
                     <Route path="/brand-activity" element={<BrandActivity />} />
+                    <Route path="/brand-activity/searches" element={<BrandActivitySearches />} />
                     <Route path="/brand-activity/:brandId" element={<BrandActivityDetail />} />
                     <Route path="/login" element={<Navigate to="/dashboard" replace />} />
                     <Route path="/" element={<Navigate to="/dashboard" replace />} />

@@ -150,12 +150,23 @@ const BrandActivity: React.FC = () => {
 
   return (
     <div className="text-gray-100">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold mb-1">Brand Activity</h1>
-        <p className="text-sm text-gray-400">
-          Behavioural log of brands on the platform. Use this to spot drop-off,
-          identify cold accounts, and prioritise outreach.
-        </p>
+      <div className="mb-6 flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-bold mb-1">Brand Activity</h1>
+          <p className="text-sm text-gray-400">
+            Behavioural log of brands on the platform. Use this to spot drop-off,
+            identify cold accounts, and prioritise outreach.
+          </p>
+        </div>
+        <button
+          onClick={() => navigate('/brand-activity/searches')}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-dark-800 border border-dark-700 hover:border-primary text-sm font-medium text-gray-200 hover:text-white transition-colors"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          Top searches →
+        </button>
       </div>
 
       {/* Summary tiles */}

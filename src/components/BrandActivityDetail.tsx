@@ -36,6 +36,7 @@ interface Event {
   target_id?: string;
   target_type?: string;
   duration_ms?: number;
+  viewed_duration_ms?: number; // attached server-side for creator_profile_viewed
   metadata?: Record<string, any>;
   captured_at: string;
   target_creator?: CreatorRef | null;
@@ -127,10 +128,12 @@ const EVENT_LABELS: Record<string, string> = {
   package_added_to_cart: '🛒 Added to cart',
   cart_viewed: '🛍 Viewed cart',
   cart_item_removed: '➖ Removed from cart',
+  cart_emptied: '🗑 Emptied cart',
   checkout_started: '🚦 Started checkout',
   checkout_payment_initiated: '💳 Initiated payment',
   checkout_abandoned: '🥶 Abandoned checkout',
   checkout_payment_completed: '🎉 Completed payment',
+  checkout_payment_failed: '❌ Payment failed',
   order_viewed: '📦 Viewed order',
   submission_reviewed: '🔍 Reviewed submission',
   revision_requested: '↩ Requested revision',
@@ -331,21 +334,42 @@ const BrandActivityDetail: React.FC = () => {
               {open && (
                 <div className="border-t border-dark-700 bg-dark-900/40">
                   <ol className="divide-y divide-dark-700">
-                    {s.events.map((e) => (
-                      <li key={e._id} className="px-4 py-2.5 flex items-start gap-3 text-sm">
-                        <span className="text-xs text-gray-500 font-mono mt-0.5 whitespace-nowrap">
-                          {new Date(e.captured_at).toLocaleTimeString()}
-                        </span>
-                        <span className="text-gray-200 whitespace-nowrap">{eventLabel(e.event_type)}</span>
-                        <span className="text-xs text-gray-500 truncate min-w-0 flex-1">
-                          {e.target_creator
-                            ? `@${e.target_creator.username || e.target_creator.name}`
-                            : e.page_url || ''}
-                          {e.metadata?.search_query ? ` "${e.metadata.search_query}"` : ''}
-                          {e.metadata?.amount ? ` · ${e.metadata.amount} ${e.metadata.currency || ''}` : ''}
-                        </span>
-                      </li>
-                    ))}
+                    {s.events.map((e) => {
+                      // Highlight high-intent (long view) creator visits
+                      const longView =
+                        e.event_type === 'creator_profile_viewed' &&
+                        typeof e.viewed_duration_ms === 'number' &&
+                        e.viewed_duration_ms >= 30_000;
+                      return (
+                        <li
+                          key={e._id}
+                          className={`px-4 py-2.5 flex items-start gap-3 text-sm ${longView ? 'bg-blue-500/5' : ''}`}
+                        >
+                          <span className="text-xs text-gray-500 font-mono mt-0.5 whitespace-nowrap">
+                            {new Date(e.captured_at).toLocaleTimeString()}
+                          </span>
+                          <span className="text-gray-200 whitespace-nowrap">{eventLabel(e.event_type)}</span>
+                          <span className="text-xs text-gray-500 truncate min-w-0 flex-1">
+                            {e.target_creator
+                              ? `@${e.target_creator.username || e.target_creator.name}`
+                              : e.page_url || ''}
+                            {e.metadata?.search_query ? ` "${e.metadata.search_query}"` : ''}
+                            {e.metadata?.amount ? ` · ${e.metadata.amount} ${e.metadata.currency || ''}` : ''}
+                            {e.event_type === 'creator_profile_viewed' && typeof e.viewed_duration_ms === 'number' && (
+                              <span className={`ml-2 ${longView ? 'text-blue-300 font-semibold' : 'text-gray-400'}`}>
+                                ({fmtDuration(e.viewed_duration_ms)})
+                              </span>
+                            )}
+                            {e.event_type === 'checkout_abandoned' && e.metadata?.synthetic && (
+                              <span className="ml-2 text-amber-400 italic">(auto-detected, no checkout in {Math.round((e.duration_ms || 0) / 60000)}m)</span>
+                            )}
+                            {e.event_type === 'checkout_payment_failed' && e.metadata?.err_msg && (
+                              <span className="ml-2 text-red-400">— {e.metadata.err_msg}</span>
+                            )}
+                          </span>
+                        </li>
+                      );
+                    })}
                   </ol>
                 </div>
               )}

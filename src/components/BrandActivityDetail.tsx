@@ -334,7 +334,23 @@ const BrandActivityDetail: React.FC = () => {
               {open && (
                 <div className="border-t border-dark-700 bg-dark-900/40">
                   <ol className="divide-y divide-dark-700">
-                    {s.events.map((e) => {
+                    {s.events
+                      .filter((e, idx, arr) => {
+                        // Dedupe: drop page_view that fires within 5s of a
+                        // creator_profile_viewed for the SAME creator. The two
+                        // events represent one logical "arrived on profile."
+                        if (e.event_type !== 'page_view' || !e.target_creator) return true;
+                        const t = new Date(e.captured_at).getTime();
+                        return !arr.some((other) => {
+                          if (other === e) return false;
+                          if (other.event_type !== 'creator_profile_viewed') return false;
+                          if (!other.target_creator) return false;
+                          if (other.target_creator.username !== e.target_creator?.username) return false;
+                          const dt = Math.abs(t - new Date(other.captured_at).getTime());
+                          return dt < 5000;
+                        });
+                      })
+                      .map((e) => {
                       // Highlight high-intent (long view) creator visits
                       const longView =
                         e.event_type === 'creator_profile_viewed' &&

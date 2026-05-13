@@ -256,6 +256,27 @@ const BrandDetail: React.FC = () => {
           </div>
         </div>
 
+        {/* ── BUSINESS ── industry + campaign goal */}
+        {(brand.category || brand.campaign_goal) && (
+          <div style={{ ...card, marginBottom: 16 }}>
+            <p style={sectionTitle}>Business</p>
+            <div className="bd-grid-2">
+              <div>
+                <p style={fieldLabel}>Industry</p>
+                <p style={{ ...fieldValue, fontWeight: 600 }}>
+                  {brand.category ? capitalize(brand.category) : '—'}
+                </p>
+              </div>
+              <div>
+                <p style={fieldLabel}>Campaign Goal</p>
+                <p style={{ ...fieldValue, fontWeight: 600 }}>
+                  {brand.campaign_goal ? capitalize(brand.campaign_goal) : '—'}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* ── CONTACT + ACCOUNT INFO ── */}
         <div className="bd-grid-2" style={{ marginBottom: 16 }}>
 

@@ -371,6 +371,21 @@ const BrandActivityDetail: React.FC = () => {
                               : e.page_url || ''}
                             {e.metadata?.search_query ? ` "${e.metadata.search_query}"` : ''}
                             {e.metadata?.amount ? ` · ${e.metadata.amount} ${e.metadata.currency || ''}` : ''}
+                            {e.event_type === 'explore_filter_applied' && Array.isArray(e.metadata?.applied_filters) && e.metadata.applied_filters.length > 0 && (
+                              <span className="ml-1 inline-flex flex-wrap gap-1 align-middle">
+                                {e.metadata.applied_filters.map((k: string) => (
+                                  <span
+                                    key={k}
+                                    className="inline-block bg-blue-500/15 text-blue-300 text-[10px] font-semibold px-1.5 py-0.5 rounded uppercase tracking-wider"
+                                  >
+                                    {String(k).replace(/_/g, ' ')}
+                                  </span>
+                                ))}
+                              </span>
+                            )}
+                            {e.event_type === 'explore_filter_applied' && Array.isArray(e.metadata?.applied_filters) && e.metadata.applied_filters.length === 0 && (
+                              <span className="ml-1 text-gray-500 italic">(cleared)</span>
+                            )}
                             {e.event_type === 'creator_profile_viewed' && typeof e.viewed_duration_ms === 'number' && (
                               <span className={`ml-2 ${longView ? 'text-blue-300 font-semibold' : 'text-gray-400'}`}>
                                 ({fmtDuration(e.viewed_duration_ms)})

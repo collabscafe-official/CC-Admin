@@ -21,6 +21,9 @@ const SocialSyncStatus = lazy(() => import('./src/components/SocialSyncStatus'))
 const BrandActivity = lazy(() => import('./src/components/BrandActivity'));
 const BrandActivityDetail = lazy(() => import('./src/components/BrandActivityDetail'));
 const BrandActivitySearches = lazy(() => import('./src/components/BrandActivitySearches'));
+const AdminOrders = lazy(() => import('./src/components/AdminOrders'));
+const AdminOrderDetail = lazy(() => import('./src/components/AdminOrderDetail'));
+const AdminDisputes = lazy(() => import('./src/components/AdminDisputes'));
 const LoginPage = lazy(() => import('./src/components/LoginPage'));
 
 const App: React.FC = () => {
@@ -56,7 +59,11 @@ const Main: React.FC = () => {
                 ? 'Bulk Email'
                 : pathname.startsWith('/social-sync')
                   ? 'Social Sync'
-                  : 'Dashboard';
+                  : pathname.startsWith('/orders')
+                    ? 'Orders'
+                    : pathname.startsWith('/disputes')
+                      ? 'Disputes'
+                      : 'Dashboard';
 
   const setActiveScreen = (screen: string) => {
     switch (screen) {
@@ -83,6 +90,12 @@ const Main: React.FC = () => {
         break;
       case 'Brand Activity':
         navigate('/brand-activity');
+        break;
+      case 'Orders':
+        navigate('/orders');
+        break;
+      case 'Disputes':
+        navigate('/disputes');
         break;
       case 'Dashboard':
       default:
@@ -125,6 +138,9 @@ const Main: React.FC = () => {
                     <Route path="/brand-activity" element={<BrandActivity />} />
                     <Route path="/brand-activity/searches" element={<BrandActivitySearches />} />
                     <Route path="/brand-activity/:brandId" element={<BrandActivityDetail />} />
+                    <Route path="/orders" element={<AdminOrders />} />
+                    <Route path="/orders/:id" element={<AdminOrderDetail />} />
+                    <Route path="/disputes" element={<AdminDisputes />} />
                     <Route path="/login" element={<Navigate to="/dashboard" replace />} />
                     <Route path="/" element={<Navigate to="/dashboard" replace />} />
                     <Route path="*" element={<Navigate to="/dashboard" replace />} />

@@ -371,21 +371,50 @@ const BrandActivityDetail: React.FC = () => {
                               : e.page_url || ''}
                             {e.metadata?.search_query ? ` "${e.metadata.search_query}"` : ''}
                             {e.metadata?.amount ? ` · ${e.metadata.amount} ${e.metadata.currency || ''}` : ''}
-                            {e.event_type === 'explore_filter_applied' && Array.isArray(e.metadata?.applied_filters) && e.metadata.applied_filters.length > 0 && (
-                              <span className="ml-1 inline-flex flex-wrap gap-1 align-middle">
-                                {e.metadata.applied_filters.map((k: string) => (
-                                  <span
-                                    key={k}
-                                    className="inline-block bg-blue-500/15 text-blue-300 text-[10px] font-semibold px-1.5 py-0.5 rounded uppercase tracking-wider"
-                                  >
-                                    {String(k).replace(/_/g, ' ')}
+                            {e.event_type === 'explore_filter_applied' && (() => {
+                              const af = e.metadata?.applied_filters;
+                              // New shape (key→value object). Renders pills like "GENDER: Female".
+                              if (af && typeof af === 'object' && !Array.isArray(af)) {
+                                const entries = Object.entries(af);
+                                if (entries.length === 0) {
+                                  return <span className="ml-1 text-gray-500 italic">(cleared)</span>;
+                                }
+                                return (
+                                  <span className="ml-1 inline-flex flex-wrap gap-1 align-middle">
+                                    {entries.map(([k, v]) => (
+                                      <span
+                                        key={k}
+                                        className="inline-flex items-baseline gap-1 bg-blue-500/15 text-blue-300 text-[10px] px-1.5 py-0.5 rounded"
+                                      >
+                                        <span className="font-semibold uppercase tracking-wider opacity-70">
+                                          {k.replace(/_/g, ' ')}:
+                                        </span>
+                                        <span>{Array.isArray(v) ? v.join(', ') : String(v)}</span>
+                                      </span>
+                                    ))}
                                   </span>
-                                ))}
-                              </span>
-                            )}
-                            {e.event_type === 'explore_filter_applied' && Array.isArray(e.metadata?.applied_filters) && e.metadata.applied_filters.length === 0 && (
-                              <span className="ml-1 text-gray-500 italic">(cleared)</span>
-                            )}
+                                );
+                              }
+                              // Legacy shape (pre-2026-05-14 events): array of keys with no values.
+                              if (Array.isArray(af)) {
+                                if (af.length === 0) {
+                                  return <span className="ml-1 text-gray-500 italic">(cleared)</span>;
+                                }
+                                return (
+                                  <span className="ml-1 inline-flex flex-wrap gap-1 align-middle">
+                                    {af.map((k: string) => (
+                                      <span
+                                        key={k}
+                                        className="inline-block bg-blue-500/15 text-blue-300 text-[10px] font-semibold px-1.5 py-0.5 rounded uppercase tracking-wider"
+                                      >
+                                        {String(k).replace(/_/g, ' ')}
+                                      </span>
+                                    ))}
+                                  </span>
+                                );
+                              }
+                              return null;
+                            })()}
                             {e.event_type === 'creator_profile_viewed' && typeof e.viewed_duration_ms === 'number' && (
                               <span className={`ml-2 ${longView ? 'text-blue-300 font-semibold' : 'text-gray-400'}`}>
                                 ({fmtDuration(e.viewed_duration_ms)})

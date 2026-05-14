@@ -11,6 +11,7 @@ interface CsvCampaign {
   name: string;
   subject: string;
   status: 'draft' | 'running' | 'paused' | 'completed' | 'failed' | 'cancelled';
+  htmlContent?: string;
   totalTargeted: number;
   sentCount: number;
   failedCount: number;
@@ -56,6 +57,21 @@ function fmtDate(d?: string) {
 
 function apiHeaders() {
   return { 'x-api-key': EMAIL_API_KEY };
+}
+
+// Substitute campaign variables with sample values so the preview iframe
+// renders something representative. For CSV campaigns, custom-mapped columns
+// (e.g. {{firstName}}, {{company}}) live per-row; for the campaign-level
+// preview we just replace the common ones and leave unknowns visible.
+function buildPreview(html: string): string {
+  if (!html) return '';
+  return html
+    .replace(/\{\{\s*name\s*\}\}/gi, 'Sample Recipient')
+    .replace(/\{\{\s*first_name\s*\}\}/gi, 'Sample')
+    .replace(/\{\{\s*email\s*\}\}/gi, 'recipient@example.com')
+    // Leave unknown placeholders ({{firstName}}, {{company}}, etc.) visible
+    // so the admin can verify which custom variables their template references.
+    ;
 }
 
 // ── Styles ────────────────────────────────────────────────────────────────────
@@ -170,6 +186,43 @@ const STYLES = `
     font-size:11px; font-weight:700; color:rgba(255,255,255,0.35);
     text-transform:uppercase; letter-spacing:0.07em; margin:0 0 14px;
   }
+
+  /* Template preview — rendered iframe + Preview/Source tab + Desktop/Mobile toggle */
+  .cd-preview-toolbar {
+    display:flex; align-items:center; justify-content:space-between;
+    flex-wrap:wrap; gap:10px; margin-bottom:12px;
+  }
+  .cd-pill-group {
+    display:inline-flex; gap:4px;
+    background:rgba(255,255,255,0.04);
+    border:1px solid rgba(255,255,255,0.07);
+    border-radius:8px; padding:3px;
+  }
+  .cd-pill {
+    background:none; border:none; cursor:pointer;
+    padding:5px 12px; font-size:12px; font-weight:600;
+    border-radius:6px; color:rgba(255,255,255,0.55);
+    transition:all 0.15s ease;
+  }
+  .cd-pill.active { background:rgba(79,70,229,0.18); color:#a5b4fc; }
+  .cd-pill:hover:not(.active) { color:rgba(255,255,255,0.85); }
+
+  .cd-iframe-wrap {
+    background:#fff; border-radius:8px; overflow:hidden;
+    border:1px solid rgba(255,255,255,0.08);
+    transition:max-width 0.25s ease;
+    margin:0 auto;
+  }
+  .cd-iframe {
+    width:100%; height:520px; border:none; display:block; background:white;
+  }
+  .cd-code-block {
+    background:#1f2937; border:1px solid rgba(255,255,255,0.08);
+    border-radius:8px; padding:14px;
+    font-family:'Courier New',monospace; font-size:12px;
+    color:rgba(255,255,255,0.7); line-height:1.6;
+    white-space:pre-wrap; word-break:break-word; margin:0;
+  }
 `;
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -188,6 +241,10 @@ export default function CsvEmailCampaignDetail() {
   const [recipPage, setRecipPage]     = useState(1);
   const [recipTotalPages, setRecipTotalPages] = useState(1);
   const [statusFilter, setStatusFilter] = useState('');
+
+  // Template preview viewer state (mirrors EmailCampaignDetail).
+  const [previewMode, setPreviewMode] = useState<'desktop' | 'mobile'>('desktop');
+  const [previewTab, setPreviewTab]   = useState<'preview' | 'source'>('preview');
 
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval>>();
@@ -407,6 +464,66 @@ export default function CsvEmailCampaignDetail() {
           {campaign.pausedAt && campaign.status === 'paused' && <span>Paused: <strong style={{ color: '#f59e0b' }}>{fmtDate(campaign.pausedAt)}</strong></span>}
         </div>
       </div>
+
+      {/* Email Template Used */}
+      {campaign.htmlContent && (
+        <div className="cd-card">
+          <div className="cd-preview-toolbar">
+            <p className="cd-section-label" style={{ margin: 0 }}>Email Template Used</p>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+              <div className="cd-pill-group">
+                <button
+                  type="button"
+                  className={`cd-pill${previewTab === 'preview' ? ' active' : ''}`}
+                  onClick={() => setPreviewTab('preview')}
+                >
+                  Preview
+                </button>
+                <button
+                  type="button"
+                  className={`cd-pill${previewTab === 'source' ? ' active' : ''}`}
+                  onClick={() => setPreviewTab('source')}
+                >
+                  Source
+                </button>
+              </div>
+              {previewTab === 'preview' && (
+                <div className="cd-pill-group">
+                  <button
+                    type="button"
+                    className={`cd-pill${previewMode === 'desktop' ? ' active' : ''}`}
+                    onClick={() => setPreviewMode('desktop')}
+                  >
+                    Desktop
+                  </button>
+                  <button
+                    type="button"
+                    className={`cd-pill${previewMode === 'mobile' ? ' active' : ''}`}
+                    onClick={() => setPreviewMode('mobile')}
+                  >
+                    Mobile
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+          {previewTab === 'preview' ? (
+            <div
+              className="cd-iframe-wrap"
+              style={{ maxWidth: previewMode === 'mobile' ? 390 : '100%' }}
+            >
+              <iframe
+                className="cd-iframe"
+                srcDoc={buildPreview(campaign.htmlContent)}
+                title="Email template preview"
+                sandbox=""
+              />
+            </div>
+          ) : (
+            <pre className="cd-code-block">{campaign.htmlContent}</pre>
+          )}
+        </div>
+      )}
 
       {/* Recipients log */}
       <div className="cd-card">

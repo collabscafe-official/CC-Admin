@@ -13,6 +13,7 @@ interface Campaign {
   templateType: string;
   subject: string;
   customBody?: string;
+  audience?: 'creator' | 'brand';
   status: 'draft' | 'running' | 'paused' | 'completed' | 'failed' | 'cancelled';
   totalTargeted: number;
   sentCount: number;
@@ -70,6 +71,41 @@ function apiHeaders(json = false) {
   const h: Record<string, string> = { 'x-api-key': EMAIL_API_KEY };
   if (json) h['Content-Type'] = 'application/json';
   return h;
+}
+
+// Substitute campaign variables with sample values so the preview iframe
+// renders something representative. Mirrors the buildPreview helper in
+// EmailCampaigns.tsx (the create modal) — keep them in sync.
+function buildPreview(html: string, audience?: 'creator' | 'brand'): string {
+  if (!html) return '';
+  const isBrand = audience === 'brand';
+  const brandName    = 'Acme Co';
+  const contactFirst = 'Sarah';
+  const contactLast  = 'Khan';
+  const contactFull  = `${contactFirst} ${contactLast}`;
+  const contactEmail = 'sarah@acme.com';
+  const brandEmail   = 'contact@acme.com';
+  const creatorName  = 'Mudassir';
+  const creatorEmail = 'mudassir@collabscafe.com';
+
+  const sampleName  = isBrand ? contactFull             : creatorName;
+  const sampleFirst = isBrand ? contactFirst            : creatorName;
+  const sampleEmail = isBrand ? brandEmail              : creatorEmail;
+  const sampleUrl   = isBrand ? 'https://collabscafe.com' : 'https://creator.collabscafe.com';
+
+  return html
+    .replace(/\{\{\s*brand_name\s*\}\}/gi, brandName)
+    .replace(/\{\{\s*contact_person\s*\}\}/gi, contactFull)
+    .replace(/\{\{\s*contact_first_name\s*\}\}/gi, contactFirst)
+    .replace(/\{\{\s*contact_last_name\s*\}\}/gi, contactLast)
+    .replace(/\{\{\s*contact_email\s*\}\}/gi, contactEmail)
+    .replace(/\{\{\s*first_name\s*\}\}/gi, sampleFirst)
+    .replace(/\{\{\s*name\s*\}\}/gi, sampleName)
+    .replace(/\{\{\s*CREATOR_NAME\s*\}\}/gi, creatorName)
+    .replace(/\{\{\s*email\s*\}\}/gi, sampleEmail)
+    .replace(/\{\{\s*profile_url\s*\}\}/gi, sampleUrl)
+    .replace(/\{\{\s*custom_body\s*\}\}/gi, '<p>Your custom email content will appear here.</p>')
+    .replace(/\{\{\s*\w+\s*\}\}/g, '');
 }
 
 // ── Styles ────────────────────────────────────────────────────────────────────
@@ -184,6 +220,36 @@ const STYLES = `
   .ecd-divider { border:none; border-top:1px solid rgba(255,255,255,0.07); margin:16px 0; }
 
   .ecd-empty { text-align:center; padding:40px 20px; color:rgba(255,255,255,0.35); font-size:14px; }
+
+  /* Template preview — rendered iframe + Preview/Source tab + Desktop/Mobile toggle */
+  .ecd-preview-toolbar {
+    display:flex; align-items:center; justify-content:space-between;
+    flex-wrap:wrap; gap:10px; margin-bottom:12px;
+  }
+  .ecd-pill-group {
+    display:inline-flex; gap:4px;
+    background:rgba(255,255,255,0.04);
+    border:1px solid rgba(255,255,255,0.07);
+    border-radius:8px; padding:3px;
+  }
+  .ecd-pill {
+    background:none; border:none; cursor:pointer;
+    padding:5px 12px; font-size:12px; font-weight:600;
+    border-radius:6px; color:rgba(255,255,255,0.55);
+    transition:all 0.15s ease;
+  }
+  .ecd-pill.active { background:rgba(79,70,229,0.18); color:#a5b4fc; }
+  .ecd-pill:hover:not(.active) { color:rgba(255,255,255,0.85); }
+
+  .ecd-iframe-wrap {
+    background:#fff; border-radius:8px; overflow:hidden;
+    border:1px solid rgba(255,255,255,0.08);
+    transition:max-width 0.25s ease;
+    margin:0 auto;
+  }
+  .ecd-iframe {
+    width:100%; height:520px; border:none; display:block; background:white;
+  }
 `;
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -203,6 +269,10 @@ export default function EmailCampaignDetail() {
   const [logsLoading, setLogsLoading] = useState(false);
   const [logsPage, setLogsPage] = useState(1);
   const [activeTab, setActiveTab] = useState<LogTab>('all');
+
+  // Template preview viewer state (mirrors the create modal's pattern).
+  const [previewMode, setPreviewMode] = useState<'desktop' | 'mobile'>('desktop');
+  const [previewTab, setPreviewTab] = useState<'preview' | 'source'>('preview');
 
   const isRunningRef = useRef(false);
   const [remainingMs, setRemainingMs] = useState<number | null>(null);
@@ -382,6 +452,15 @@ export default function EmailCampaignDetail() {
             <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: 'white' }}>{campaign.name}</h1>
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <span
+              className="ecd-badge"
+              style={{
+                background: campaign.audience === 'brand' ? 'rgba(245,158,11,0.18)' : 'rgba(79,70,229,0.18)',
+                color:      campaign.audience === 'brand' ? '#fbbf24'             : '#a5b4fc',
+              }}
+            >
+              {campaign.audience === 'brand' ? 'Brands' : 'Creators'}
+            </span>
             <span className="ecd-badge" style={{ background: typeMeta.color + '22', color: typeMeta.color }}>{typeMeta.label}</span>
             <span className="ecd-badge" style={{ background: statusMeta.color + '22', color: statusMeta.color }}>
               {statusMeta.pulse && <span className="ecd-dot-pulse" style={{ background: statusMeta.color }} />}
@@ -419,8 +498,62 @@ export default function EmailCampaignDetail() {
           {campaign.customBody && (
             <>
               <hr className="ecd-divider" />
-              <p style={{ margin: '0 0 8px', fontSize: 11, color: 'rgba(255,255,255,0.38)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Email Body</p>
-              <pre className="ecd-code-block">{campaign.customBody}</pre>
+              <div className="ecd-preview-toolbar">
+                <p style={{ margin: 0, fontSize: 11, color: 'rgba(255,255,255,0.38)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                  Email Template Used
+                </p>
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <div className="ecd-pill-group">
+                    <button
+                      type="button"
+                      className={`ecd-pill${previewTab === 'preview' ? ' active' : ''}`}
+                      onClick={() => setPreviewTab('preview')}
+                    >
+                      Preview
+                    </button>
+                    <button
+                      type="button"
+                      className={`ecd-pill${previewTab === 'source' ? ' active' : ''}`}
+                      onClick={() => setPreviewTab('source')}
+                    >
+                      Source
+                    </button>
+                  </div>
+                  {previewTab === 'preview' && (
+                    <div className="ecd-pill-group">
+                      <button
+                        type="button"
+                        className={`ecd-pill${previewMode === 'desktop' ? ' active' : ''}`}
+                        onClick={() => setPreviewMode('desktop')}
+                      >
+                        Desktop
+                      </button>
+                      <button
+                        type="button"
+                        className={`ecd-pill${previewMode === 'mobile' ? ' active' : ''}`}
+                        onClick={() => setPreviewMode('mobile')}
+                      >
+                        Mobile
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+              {previewTab === 'preview' ? (
+                <div
+                  className="ecd-iframe-wrap"
+                  style={{ maxWidth: previewMode === 'mobile' ? 390 : '100%' }}
+                >
+                  <iframe
+                    className="ecd-iframe"
+                    srcDoc={buildPreview(campaign.customBody, campaign.audience)}
+                    title="Email template preview"
+                    sandbox=""
+                  />
+                </div>
+              ) : (
+                <pre className="ecd-code-block">{campaign.customBody}</pre>
+              )}
             </>
           )}
         </div>

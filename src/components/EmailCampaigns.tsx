@@ -11,6 +11,7 @@ interface Campaign {
   _id: string;
   name: string;
   templateType: string;
+  audience?: 'creator' | 'brand';
   subject: string;
   customBody?: string;
   status: 'draft' | 'running' | 'paused' | 'completed' | 'failed' | 'cancelled';
@@ -35,6 +36,17 @@ interface SegFilters {
   approvalStatus: '' | 'true' | 'false';
   gender: string;
   country: string;
+}
+
+// Brand audience filter shape — mirrors targetFilters.brand on the backend.
+// Categories + campaign goals are multi-select arrays so admins can target
+// "all Beauty + Fashion brands with Awareness as their goal" in one campaign.
+interface BrandFilters {
+  categories: string[];
+  campaignGoals: string[];
+  country: string;
+  emailVerified: '' | 'true' | 'false';
+  profileCompleted: '' | 'true' | 'false';
 }
 
 // ── Template defaults (fallback if API unreachable) ───────────────────────────
@@ -207,6 +219,42 @@ const INSERT_VARS = [
   { key: '{{profile_url}}', label: 'Profile URL' },
 ];
 
+// Brand-audience variables available in the email body AND subject for brand
+// campaigns. Email is sent to the brand's main account login; contact_*
+// variables resolve at send time from brand_team_members (admin first, then
+// most-recent active member). contact_person falls back to brand_name when no
+// team member exists, so salutations never render "Hi ,".
+const BRAND_INSERT_VARS = [
+  { key: '{{brand_name}}',         label: "Brand name (e.g. Acme Co)" },
+  { key: '{{contact_person}}',     label: "Contact person — full name (fallback: brand_name)" },
+  { key: '{{contact_first_name}}', label: "Contact's first name (fallback: brand_name)" },
+  { key: '{{contact_last_name}}',  label: "Contact's last name" },
+  { key: '{{contact_email}}',      label: "Contact's email (team_members)" },
+  { key: '{{email}}',              label: "Brand login email" },
+  { key: '{{first_name}}',         label: "Alias for contact_first_name" },
+];
+
+// Industries available for brand category targeting. Must match the list used
+// in CC-Public's brand onboarding (BrandProfileStep.jsx) — adding values here
+// without updating the brand schema is harmless (no match → empty audience).
+const BRAND_CATEGORIES = [
+  'Beauty', 'Fashion', 'Food & Beverage', 'Tech', 'Lifestyle',
+  'Fitness', 'Travel', 'Home & Decor', 'Auto', 'Finance', 'Health', 'Other',
+];
+
+// Campaign-goal values used for brand targeting. Same as BrandProfileStep.jsx.
+const BRAND_GOALS = [
+  'Awareness', 'Sales', 'UGC Content', 'Engagement', 'Lead Generation',
+];
+
+// Campaign-type tiles shown when audience='brand'. Brand v1 supports custom
+// only (no pre-built brand templates). 'custom_all' = send to all matching
+// brands; 'custom_segment' = filter by industry/goal/etc.
+const BRAND_CAMPAIGN_TYPES = [
+  { id: 'custom_all',     icon: '📢', title: 'Custom — All Brands', sub: 'Send to all active brands' },
+  { id: 'custom_segment', icon: '🎯', title: 'Custom — Segment',     sub: 'Filter brands by industry, goal, location' },
+];
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function toTemplateType(t: string): string {
   if (t === 'incomplete_profile') return 'incomplete-profile';
@@ -226,11 +274,35 @@ function apiHeaders(json = false) {
   return h;
 }
 
-function buildPreview(html: string): string {
+function buildPreview(html: string, audience?: 'creator' | 'brand'): string {
+  const isBrand = audience === 'brand';
+  // Brand preview: sample contact person + sample brand. Mirrors the server-
+  // side buildVariables shape in collabscafe-email-service/services/template.service.js.
+  const brandName     = 'Acme Co';
+  const contactFirst  = 'Sarah';
+  const contactLast   = 'Khan';
+  const contactFull   = `${contactFirst} ${contactLast}`;
+  const contactEmail  = 'sarah@acme.com';
+  const brandEmail    = 'contact@acme.com';
+  const creatorName   = 'Mudassir';
+  const creatorEmail  = 'mudassir@collabscafe.com';
+
+  const sampleName  = isBrand ? contactFull           : creatorName;
+  const sampleFirst = isBrand ? contactFirst          : creatorName;
+  const sampleEmail = isBrand ? brandEmail            : creatorEmail;
+  const sampleUrl   = isBrand ? 'https://collabscafe.com' : 'https://creator.collabscafe.com';
+
   return html
-    .replace(/\{\{\s*first_name\s*\}\}/gi, 'Mudassir')
-    .replace(/\{\{\s*email\s*\}\}/gi, 'mudassir@collabscafe.com')
-    .replace(/\{\{\s*profile_url\s*\}\}/gi, 'https://creator.collabscafe.com')
+    .replace(/\{\{\s*brand_name\s*\}\}/gi, brandName)
+    .replace(/\{\{\s*contact_person\s*\}\}/gi, contactFull)
+    .replace(/\{\{\s*contact_first_name\s*\}\}/gi, contactFirst)
+    .replace(/\{\{\s*contact_last_name\s*\}\}/gi, contactLast)
+    .replace(/\{\{\s*contact_email\s*\}\}/gi, contactEmail)
+    .replace(/\{\{\s*first_name\s*\}\}/gi, sampleFirst)
+    .replace(/\{\{\s*name\s*\}\}/gi, sampleName)
+    .replace(/\{\{\s*CREATOR_NAME\s*\}\}/gi, creatorName)
+    .replace(/\{\{\s*email\s*\}\}/gi, sampleEmail)
+    .replace(/\{\{\s*profile_url\s*\}\}/gi, sampleUrl)
     .replace(/\{\{\s*custom_body\s*\}\}/gi, '<p>Your custom email content will appear here.</p>')
     .replace(/\{\{\s*\w+\s*\}\}/g, '');
 }
@@ -564,9 +636,19 @@ export default function EmailCampaigns() {
   const navigate = useNavigate();
 
   // Builder state
+  // Audience: 'creator' (default; queries Influencer collection) or 'brand'
+  // (queries Brand collection — backend Campaign.audience field switches the
+  // recipient query at both preview-time and send-time).
+  const [audience, setAudience]           = useState<'creator' | 'brand'>('creator');
   const [campaignType, setCampaignType]   = useState('');
   const [segFilters, setSegFilters]        = useState<SegFilters>({
     profileCompleted: '', emailVerified: '', approvalStatus: '', gender: '', country: '',
+  });
+  // Brand-audience filter state. Only consulted when audience === 'brand' AND
+  // campaignType === 'custom_segment'. Otherwise sent empty (custom_all targets
+  // every active brand).
+  const [brandFilters, setBrandFilters]   = useState<BrandFilters>({
+    categories: [], campaignGoals: [], country: '', emailVerified: '', profileCompleted: '',
   });
   const [campaignName, setCampaignName]   = useState('');
   const [subject, setSubject]             = useState('');
@@ -629,9 +711,9 @@ export default function EmailCampaigns() {
 
   // ── Debounced modal preview ──────────────────────────────────────────────────
   useEffect(() => {
-    const id = setTimeout(() => setPendingPreviewHtml(buildPreview(pendingHtml)), 300);
+    const id = setTimeout(() => setPendingPreviewHtml(buildPreview(pendingHtml, audience)), 300);
     return () => clearTimeout(id);
-  }, [pendingHtml]);
+  }, [pendingHtml, audience]);
 
   // ── Initialize rich editor iframe when entering rich mode ────────────────────
   useEffect(() => {
@@ -678,9 +760,41 @@ export default function EmailCampaigns() {
     setPreviewCreators([]);
     setExcludedIds([]);
     setPreviewTotal(0);
+    // Brand campaigns: no pre-built template fetch (admin writes their own
+    // custom body). Mark as loaded so the editor / Save flow doesn't gate on
+    // a template that doesn't exist for this audience.
+    if (audience === 'brand') {
+      setHtmlContent('');
+      setTemplateLoaded(true);
+      setTemplateLoading(false);
+      setEditorError('');
+      return;
+    }
     loadTemplate(campaignType);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [campaignType]);
+  }, [campaignType, audience]);
+
+  // ── Reset builder state when audience switches ───────────────────────────────
+  // Audience switching invalidates: campaign type, body, segment filters, and
+  // any preview results. Brand and Creator campaigns have different filter
+  // shapes + different recipient pools, so cross-audience state would be a bug.
+  useEffect(() => {
+    setCampaignType('');
+    setHtmlContent('');
+    setTemplateLoaded(false);
+    setPreviewRan(false);
+    setPreviewResult(null);
+    setPreviewCreators([]);
+    setExcludedIds([]);
+    setPreviewTotal(0);
+    setSegFilters({
+      profileCompleted: '', emailVerified: '', approvalStatus: '', gender: '', country: '',
+    });
+    setBrandFilters({
+      categories: [], campaignGoals: [], country: '', emailVerified: '', profileCompleted: '',
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [audience]);
 
   // ── Close modal var dropdown on outside click ────────────────────────────────
   useEffect(() => {
@@ -839,7 +953,21 @@ export default function EmailCampaigns() {
   };
 
   // ── Preview helpers ──────────────────────────────────────────────────────────
+  // Build the filter object sent to POST /campaigns/preview. Shape differs by
+  // audience because the backend uses different field names for each.
   const buildPreviewFilters = () => {
+    if (audience === 'brand') {
+      // Brand audience: only relevant when segment selected (custom_all sends
+      // to every active brand regardless of filters).
+      if (campaignType !== 'custom_segment') return undefined;
+      const f: any = {};
+      if (brandFilters.categories.length > 0)     f.categories     = brandFilters.categories;
+      if (brandFilters.campaignGoals.length > 0)  f.campaignGoals  = brandFilters.campaignGoals;
+      if (brandFilters.country)                   f.country        = brandFilters.country;
+      if (brandFilters.emailVerified    !== '')   f.emailVerified    = brandFilters.emailVerified === 'true';
+      if (brandFilters.profileCompleted !== '')   f.profileCompleted = brandFilters.profileCompleted === 'true';
+      return f;
+    }
     if (campaignType !== 'custom_segment') return undefined;
     const f: any = {};
     if (segFilters.profileCompleted !== '') f.is_profile_completed = segFilters.profileCompleted === 'true';
@@ -850,7 +978,21 @@ export default function EmailCampaigns() {
     return f;
   };
 
+  // Build the targetFilters object PERSISTED on the Campaign document.
+  // Brand-shape lives under `.brand` so it doesn't collide with creator fields.
   const buildTargetFilters = () => {
+    if (audience === 'brand') {
+      if (campaignType !== 'custom_segment') return { brand: {} };
+      return {
+        brand: {
+          categories: brandFilters.categories,
+          campaignGoals: brandFilters.campaignGoals,
+          country: brandFilters.country || '',
+          emailVerified:    brandFilters.emailVerified    === '' ? null : brandFilters.emailVerified    === 'true',
+          profileCompleted: brandFilters.profileCompleted === '' ? null : brandFilters.profileCompleted === 'true',
+        },
+      };
+    }
     if (campaignType !== 'custom_segment') return {};
     const f: any = {};
     if (segFilters.profileCompleted !== '') f.profileCompleted = segFilters.profileCompleted === 'true';
@@ -859,29 +1001,62 @@ export default function EmailCampaigns() {
     return f;
   };
 
-  const handlePreviewAll = async (page: number) => {
-    setPreviewAllLoading(true);
-    try {
-      const params = new URLSearchParams({ type: campaignType, page: String(page), limit: '50' });
-      const filters = buildPreviewFilters();
-      if (filters) {
+  // Fetch one preview page. Returns the parsed JSON, or { error: true } on any
+  // failure (404 / non-OK / network). Keeps loadAllRecipients short.
+  const fetchPreviewPage = async (page: number): Promise<any> => {
+    const params = new URLSearchParams({ audience, type: campaignType, page: String(page), limit: '50' });
+    const filters = buildPreviewFilters();
+    if (filters) {
+      if (audience === 'brand') {
+        // Brand filters use different query-param names (matches backend's
+        // previewAll → buildBrandQuery mapping).
+        if (filters.categories?.length)    params.set('categories', filters.categories.join(','));
+        if (filters.campaignGoals?.length) params.set('campaign_goals', filters.campaignGoals.join(','));
+        if (filters.country)               params.set('country', filters.country);
+        if (filters.emailVerified !== undefined)    params.set('is_email_verified',    String(filters.emailVerified));
+        if (filters.profileCompleted !== undefined) params.set('is_profile_completed', String(filters.profileCompleted));
+      } else {
         Object.entries(filters).forEach(([k, v]) => params.set(k, String(v)));
       }
+    }
+    try {
       const res = await fetch(`${EMAIL_SERVICE_URL}/campaigns/preview/all?${params}`, {
         headers: apiHeaders(),
       });
-      if (res.status === 404) {
-        setPreviewSampleOnly(true);
+      if (!res.ok) return { error: true };
+      return await res.json();
+    } catch (_) {
+      return { error: true };
+    }
+  };
+
+  // Load the FULL recipient list across all pages so exclusions can be applied
+  // over the complete set. Pagination becomes a client-side slice. If any page
+  // fails to load we flip to previewSampleOnly so send is correctly blocked.
+  const loadAllRecipients = async () => {
+    setPreviewAllLoading(true);
+    setPreviewCreators([]);
+    try {
+      const first = await fetchPreviewPage(1);
+      if (first.error) { setPreviewSampleOnly(true); return; }
+      const totalPages = first.totalPages || 1;
+      setPreviewTotalPages(totalPages);
+      setPreviewPage(1);
+      if (totalPages <= 1) {
+        setPreviewCreators(first.creators || []);
+        setPreviewSampleOnly(false);
         return;
       }
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      setPreviewCreators(data.creators || []);
-      setPreviewPage(page);
-      setPreviewTotalPages(data.totalPages || 1);
+      const rest = await Promise.all(
+        Array.from({ length: totalPages - 1 }, (_, i) => fetchPreviewPage(i + 2))
+      );
+      if (rest.some(p => p.error)) { setPreviewSampleOnly(true); return; }
+      const combined = [
+        ...(first.creators || []),
+        ...rest.flatMap(p => p.creators || []),
+      ];
+      setPreviewCreators(combined);
       setPreviewSampleOnly(false);
-    } catch (_) {
-      setPreviewSampleOnly(true);
     } finally {
       setPreviewAllLoading(false);
     }
@@ -895,7 +1070,7 @@ export default function EmailCampaigns() {
     setPreviewSampleOnly(false);
     setPreviewTotal(0);
     try {
-      const body: any = { type: campaignType };
+      const body: any = { audience, type: campaignType };
       const f = buildPreviewFilters();
       if (f) body.filters = f;
       const res = await fetch(`${EMAIL_SERVICE_URL}/campaigns/preview`, {
@@ -906,7 +1081,7 @@ export default function EmailCampaigns() {
       setPreviewResult(data);
       setPreviewRan(true);
       setPreviewTotal(data.count || 0);
-      handlePreviewAll(1);
+      loadAllRecipients();
     } catch (e: any) {
       showToast(`Preview failed: ${e.message}`, false);
     } finally {
@@ -923,7 +1098,10 @@ export default function EmailCampaigns() {
         headers: apiHeaders(true),
         body: JSON.stringify({
           name: campaignName,
-          templateType: toTemplateType(campaignType),
+          audience,                                            // 'creator' | 'brand'
+          // Brand campaigns force templateType='custom' on the backend; the
+          // mapping below collapses brand campaign types to 'custom' anyway.
+          templateType: audience === 'brand' ? 'custom' : toTemplateType(campaignType),
           subject,
           customBody: htmlContent,
           targetFilters: buildTargetFilters(),
@@ -1023,8 +1201,13 @@ export default function EmailCampaigns() {
   const currentTypeMeta = CAMPAIGN_TYPES.find(t => t.id === campaignType);
   const iframeWidth  = previewMode === 'desktop' ? 600 : 375;
 
-  // Per-page checkbox state
-  const allPageSelected   = previewCreators.length > 0 && previewCreators.every((c: any) => !excludedIds.includes(c._id));
+  // previewCreators holds the FULL recipient list (loaded across all pages
+  // by loadAllRecipients). pageCreators is the slice shown on the current
+  // page — pagination is purely client-side now.
+  const pageCreators = previewCreators.slice((previewPage - 1) * 50, previewPage * 50);
+
+  // Per-page checkbox state (operates on the visible slice).
+  const allPageSelected = pageCreators.length > 0 && pageCreators.every((c: any) => !excludedIds.includes(c._id));
 
   // ── Render ────────────────────────────────────────────────────────────────────
   return (
@@ -1046,11 +1229,43 @@ export default function EmailCampaigns() {
             <div className="ec-card">
               <h2 style={{ margin: '0 0 20px', fontSize: 16, fontWeight: 700 }}>New Campaign</h2>
 
+              {/* Audience toggle — switches the entire builder between creator + brand */}
+              <div style={{ marginBottom: 20 }}>
+                <p className="ec-section-label">Audience</p>
+                <div style={{
+                  display: 'inline-flex', gap: 4, padding: 4,
+                  background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
+                  borderRadius: 8,
+                }}>
+                  {(['creator', 'brand'] as const).map(a => (
+                    <button
+                      key={a}
+                      type="button"
+                      onClick={() => setAudience(a)}
+                      style={{
+                        padding: '7px 18px', borderRadius: 6, border: 'none', cursor: 'pointer',
+                        fontSize: 13, fontWeight: 600,
+                        background: audience === a ? 'rgba(79,70,229,0.18)' : 'transparent',
+                        color: audience === a ? '#a5b4fc' : 'rgba(255,255,255,0.55)',
+                        transition: 'all 0.15s ease',
+                      }}
+                    >
+                      {a === 'creator' ? 'Creators' : 'Brands'}
+                    </button>
+                  ))}
+                </div>
+                <p style={{ margin: '8px 0 0', fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>
+                  {audience === 'creator'
+                    ? 'Targets active creators (Influencers).'
+                    : "Targets active brands. Recipient is the brand's main account email."}
+                </p>
+              </div>
+
               {/* Step 1 — Type */}
               <div style={{ marginBottom: 20 }}>
                 <p className="ec-section-label">Step 1 — Campaign Type</p>
                 <div className="ec-type-grid">
-                  {CAMPAIGN_TYPES.map(t => (
+                  {(audience === 'brand' ? BRAND_CAMPAIGN_TYPES : CAMPAIGN_TYPES).map(t => (
                     <button
                       key={t.id}
                       className={`ec-type-card${campaignType === t.id ? ' sel' : ''}`}
@@ -1064,8 +1279,8 @@ export default function EmailCampaigns() {
                 </div>
               </div>
 
-              {/* Segment filters */}
-              <div className={`ec-collapsible${campaignType === 'custom_segment' ? ' open' : ' closed'}`}>
+              {/* Segment filters — Creator audience */}
+              <div className={`ec-collapsible${audience === 'creator' && campaignType === 'custom_segment' ? ' open' : ' closed'}`}>
                 <div style={{ padding: 14, background: 'rgba(255,255,255,0.03)', borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', marginBottom: 20 }}>
                   <p style={{ margin: '0 0 4px', fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.8)' }}>Segment Filters</p>
                   <p style={{ margin: '0 0 14px', fontSize: 12, color: 'rgba(255,255,255,0.38)' }}>Leave blank to ignore</p>
@@ -1097,6 +1312,95 @@ export default function EmailCampaigns() {
                     <div style={{ gridColumn: '1 / -1' }}>
                       <label className="ec-field-label">Country</label>
                       <input className="ec-input" placeholder="e.g. Pakistan" value={segFilters.country} onChange={e => setSegFilters(p => ({ ...p, country: e.target.value }))} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Segment filters — Brand audience */}
+              <div className={`ec-collapsible${audience === 'brand' && campaignType === 'custom_segment' ? ' open' : ' closed'}`}>
+                <div style={{ padding: 14, background: 'rgba(255,255,255,0.03)', borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', marginBottom: 20 }}>
+                  <p style={{ margin: '0 0 4px', fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.8)' }}>Brand Filters</p>
+                  <p style={{ margin: '0 0 14px', fontSize: 12, color: 'rgba(255,255,255,0.38)' }}>Multi-select where applicable. Leave blank to ignore.</p>
+
+                  {/* Industry multi-select */}
+                  <div style={{ marginBottom: 14 }}>
+                    <label className="ec-field-label">Industry</label>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                      {BRAND_CATEGORIES.map(cat => {
+                        const active = brandFilters.categories.includes(cat);
+                        return (
+                          <button
+                            key={cat}
+                            type="button"
+                            onClick={() => setBrandFilters(p => ({
+                              ...p,
+                              categories: active
+                                ? p.categories.filter(c => c !== cat)
+                                : [...p.categories, cat],
+                            }))}
+                            style={{
+                              padding: '5px 12px', borderRadius: 16,
+                              border: active ? '1px solid #4f46e5' : '1px solid rgba(255,255,255,0.12)',
+                              background: active ? 'rgba(79,70,229,0.18)' : 'rgba(255,255,255,0.04)',
+                              color: active ? '#a5b4fc' : 'rgba(255,255,255,0.65)',
+                              fontSize: 12, fontWeight: 600, cursor: 'pointer', transition: 'all 0.12s ease',
+                            }}
+                          >
+                            {cat}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Campaign goal multi-select */}
+                  <div style={{ marginBottom: 14 }}>
+                    <label className="ec-field-label">Campaign Goal</label>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                      {BRAND_GOALS.map(g => {
+                        const active = brandFilters.campaignGoals.includes(g);
+                        return (
+                          <button
+                            key={g}
+                            type="button"
+                            onClick={() => setBrandFilters(p => ({
+                              ...p,
+                              campaignGoals: active
+                                ? p.campaignGoals.filter(x => x !== g)
+                                : [...p.campaignGoals, g],
+                            }))}
+                            style={{
+                              padding: '5px 12px', borderRadius: 16,
+                              border: active ? '1px solid #4f46e5' : '1px solid rgba(255,255,255,0.12)',
+                              background: active ? 'rgba(79,70,229,0.18)' : 'rgba(255,255,255,0.04)',
+                              color: active ? '#a5b4fc' : 'rgba(255,255,255,0.65)',
+                              fontSize: 12, fontWeight: 600, cursor: 'pointer', transition: 'all 0.12s ease',
+                            }}
+                          >
+                            {g}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="ec-filter-grid">
+                    <div>
+                      <label className="ec-field-label">Email Verified</label>
+                      <select className="ec-select" value={brandFilters.emailVerified} onChange={e => setBrandFilters(p => ({ ...p, emailVerified: e.target.value as any }))}>
+                        <option value="">All</option><option value="true">Verified</option><option value="false">Unverified</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="ec-field-label">Profile Status</label>
+                      <select className="ec-select" value={brandFilters.profileCompleted} onChange={e => setBrandFilters(p => ({ ...p, profileCompleted: e.target.value as any }))}>
+                        <option value="">All</option><option value="true">Complete</option><option value="false">Incomplete</option>
+                      </select>
+                    </div>
+                    <div style={{ gridColumn: '1 / -1' }}>
+                      <label className="ec-field-label">Country</label>
+                      <input className="ec-input" placeholder="e.g. Pakistan" value={brandFilters.country} onChange={e => setBrandFilters(p => ({ ...p, country: e.target.value }))} />
                     </div>
                   </div>
                 </div>
@@ -1275,9 +1579,9 @@ export default function EmailCampaigns() {
                                       checked={allPageSelected}
                                       onChange={e => {
                                         if (e.target.checked) {
-                                          setExcludedIds(prev => prev.filter(id => !previewCreators.find((c: any) => c._id === id)));
+                                          setExcludedIds(prev => prev.filter(id => !pageCreators.find((c: any) => c._id === id)));
                                         } else {
-                                          const pageIds = previewCreators.map((c: any) => c._id).filter(Boolean);
+                                          const pageIds = pageCreators.map((c: any) => c._id).filter(Boolean);
                                           setExcludedIds(prev => [...new Set([...prev, ...pageIds])]);
                                         }
                                       }}
@@ -1289,7 +1593,7 @@ export default function EmailCampaigns() {
                                 </tr>
                               </thead>
                               <tbody>
-                                {previewCreators.map((c: any, i) => {
+                                {pageCreators.map((c: any, i) => {
                                   const isExcluded = excludedIds.includes(c._id);
                                   const rowNum = (previewPage - 1) * 50 + i + 1;
                                   return (
@@ -1325,8 +1629,8 @@ export default function EmailCampaigns() {
                                 <button
                                   className="ec-btn ec-btn-gray"
                                   style={{ padding: '5px 10px', fontSize: 12 }}
-                                  disabled={previewPage <= 1 || previewAllLoading}
-                                  onClick={() => handlePreviewAll(previewPage - 1)}
+                                  disabled={previewPage <= 1}
+                                  onClick={() => setPreviewPage(p => Math.max(1, p - 1))}
                                 >
                                   ← Prev
                                 </button>
@@ -1334,8 +1638,8 @@ export default function EmailCampaigns() {
                                 <button
                                   className="ec-btn ec-btn-gray"
                                   style={{ padding: '5px 10px', fontSize: 12 }}
-                                  disabled={previewPage >= previewTotalPages || previewAllLoading}
-                                  onClick={() => handlePreviewAll(previewPage + 1)}
+                                  disabled={previewPage >= previewTotalPages}
+                                  onClick={() => setPreviewPage(p => Math.min(previewTotalPages, p + 1))}
                                 >
                                   Next →
                                 </button>
@@ -1407,6 +1711,15 @@ export default function EmailCampaigns() {
                         <div style={{ minWidth: 0, flex: 1 }}>
                           <p style={{ margin: '0 0 6px', fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.9)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</p>
                           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                            <span
+                              className="ec-badge"
+                              style={{
+                                background: c.audience === 'brand' ? 'rgba(245,158,11,0.18)' : 'rgba(79,70,229,0.18)',
+                                color:      c.audience === 'brand' ? '#fbbf24'             : '#a5b4fc',
+                              }}
+                            >
+                              {c.audience === 'brand' ? 'Brands' : 'Creators'}
+                            </span>
                             <span className="ec-badge" style={{ background: tm.color + '22', color: tm.color }}>{tm.label}</span>
                             <span className="ec-badge" style={{ background: sm.color + '22', color: sm.color }}>
                               {sm.pulse && <span className="ec-dot-pulse" style={{ background: sm.color }} />}
@@ -1451,14 +1764,14 @@ export default function EmailCampaigns() {
         <div className="ec-backdrop" onClick={() => setConfirmOpen(false)}>
           <div className="ec-modal" onClick={e => e.stopPropagation()}>
             <h3 style={{ margin: '0 0 8px', fontSize: 17, fontWeight: 700, color: 'white' }}>
-              Send to {selectedCount.toLocaleString()} creators?
+              Send to {selectedCount.toLocaleString()} {audience === 'brand' ? 'brands' : 'creators'}?
             </h3>
             <p style={{ margin: '0 0 6px', fontSize: 13, color: 'rgba(255,255,255,0.55)' }}>
               Subject: <span style={{ color: 'rgba(255,255,255,0.8)' }}>{subject}</span>
             </p>
             {excludedIds.length > 0 && (
               <p style={{ margin: '0 0 6px', fontSize: 12, color: '#f59e0b' }}>
-                {excludedIds.length} creator{excludedIds.length !== 1 ? 's' : ''} excluded
+                {excludedIds.length} {audience === 'brand' ? 'brand' : 'creator'}{excludedIds.length !== 1 ? 's' : ''} excluded
               </p>
             )}
             <p style={{ margin: '0 0 20px', fontSize: 13, color: 'rgba(255,255,255,0.45)' }}>
@@ -1545,7 +1858,7 @@ export default function EmailCampaigns() {
                   </button>
                   {modalVarDropdownOpen && (
                     <div className="ec-var-dropdown">
-                      {INSERT_VARS.map(v => (
+                      {(audience === 'brand' ? BRAND_INSERT_VARS : INSERT_VARS).map(v => (
                         <button key={v.key} className="ec-var-item" onClick={() => handleModalCopyVar(v.key)}>
                           <span style={{ fontFamily: 'monospace', fontSize: 12, color: '#818cf8' }}>{v.key}</span>
                           <span style={{ fontSize: 11, color: modalCopiedVar === v.key ? '#10b981' : 'rgba(255,255,255,0.35)' }}>

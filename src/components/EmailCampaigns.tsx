@@ -239,7 +239,8 @@ const BRAND_INSERT_VARS = [
 // without updating the brand schema is harmless (no match → empty audience).
 const BRAND_CATEGORIES = [
   'Beauty', 'Fashion', 'Food & Beverage', 'Tech', 'Lifestyle',
-  'Fitness', 'Travel', 'Home & Decor', 'Auto', 'Finance', 'Health', 'Other',
+  'Fitness', 'Travel', 'Home & Decor', 'Auto', 'Finance', 'Health',
+  'Marketing Agency', 'Other',
 ];
 
 // Campaign-goal values used for brand targeting. Same as BrandProfileStep.jsx.

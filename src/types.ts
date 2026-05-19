@@ -23,13 +23,15 @@ export interface Package {
 }
 
 export interface ContentHighlight {
-  id: number;
-  type: 'image' | 'video';
-  thumbnailUrl: string;
-  url: string;
-  views: number;
-  likes: number;
-  comments: number;
+  _id: string;
+  src: string;
+  media_type?: 'image' | 'video';
+  url?: string;
+  position?: number;
+  // Stats are mocked in the original scaffold — backend doesn't populate them.
+  views?: number;
+  likes?: number;
+  comments?: number;
 }
 
 export interface FaqItem {

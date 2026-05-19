@@ -29,20 +29,31 @@ const ContentHighlights: React.FC<ContentHighlightsProps> = ({ highlights }) => 
         <div className="mt-8">
             <h3 className="text-2xl font-semibold text-gray-700 dark:text-gray-200 mb-6">Content Highlights</h3>
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {highlights.map((item) => (
-                    <a href={item.url} key={item._id} target="_blank" rel="noopener noreferrer" className="relative block overflow-hidden rounded-lg shadow-lg group">
-                        <img src={item?.src} alt="Content highlight" className="object-cover w-full transition-transform duration-300 transform group-hover:scale-105" />
-                        {item.type === 'video' && <PlayIcon />}
-                        {/* <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/40 to-transparent"></div>
-                        <div className="absolute bottom-0 left-0 right-0 p-4 text-white">
-                            <div className="flex items-center justify-between text-xs">
-                                <span className="flex items-center"><ViewsIcon/> {formatNumber(item.views)}</span>
-                                <span className="flex items-center"><LikesIcon/> {formatNumber(item.likes)}</span>
-                                <span className="flex items-center"><CommentsIcon/> {formatNumber(item.comments)}</span>
+                {highlights.map((item) => {
+                    const isVideo = item.media_type === 'video';
+                    // Videos get native controls and play inline (admin needs to
+                    // review content here). Images stay as a clickable link to
+                    // the portfolio URL. Wrapping a video in <a> would hijack
+                    // play-button clicks, so videos drop the anchor.
+                    if (isVideo) {
+                        return (
+                            <div key={item._id} className="relative block overflow-hidden rounded-lg shadow-lg bg-black">
+                                <video
+                                    src={item.src}
+                                    controls
+                                    preload="metadata"
+                                    playsInline
+                                    className="w-full h-full object-contain"
+                                />
                             </div>
-                        </div> */}
-                    </a>
-                ))}
+                        );
+                    }
+                    return (
+                        <a href={item.url} key={item._id} target="_blank" rel="noopener noreferrer" className="relative block overflow-hidden rounded-lg shadow-lg group">
+                            <img src={item?.src} alt="Content highlight" className="object-cover w-full transition-transform duration-300 transform group-hover:scale-105" />
+                        </a>
+                    );
+                })}
             </div>
         </div>
     );

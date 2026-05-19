@@ -169,13 +169,30 @@ function capitalize(s: string | null | undefined): string | null {
   return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
 }
 
+// Map a follower_range bucket value to one of 4 broad chart categories.
+// Exact-value lookup avoids the substring-collision bug the old fuzzy
+// matcher had (e.g. "1k-10k" → "10K–100K" because it contained "10k").
+// Legacy values (pre-2026-05-19 dropdown) are kept in the table so older
+// rows still chart correctly.
 function getFollowerBucket(range: string | null | undefined): string | null {
   if (!range) return null;
   const r = range.toLowerCase();
-  if (r.includes('100k') || r.includes('100,000') || r.includes('million') || r.includes('1m')) return '100K+';
-  if (r.includes('10k') || r.includes('10,000')) return '10K–100K';
-  if (r.includes('1k') || r.includes('1,000')) return '1K–10K';
-  return '0–1K';
+  const map: Record<string, string> = {
+    // current canonical buckets
+    '1k-10k':    '1K–10K',
+    '10k-50k':   '10K–100K',
+    '50k-100k':  '10K–100K',
+    '100k-500k': '100K+',
+    '500k-1m':   '100K+',
+    '1m+':       '100K+',
+    // legacy values still present in older rows
+    '0-1k':      '0–1K',
+    '1m-5m':     '100K+',
+    '5m-10m':    '100K+',
+    '10m+':      '100K+',
+    '1m-10m':    '100K+',
+  };
+  return map[r] || null;
 }
 
 function buildMonthSlots(): Array<{ label: string; year: number; month: number }> {
@@ -212,16 +229,28 @@ function isTruthy(v: any): boolean {
   return v === true || v === 1;
 }
 
+// Exact-value lookup table for "estimated midpoint" of each bucket. Used to
+// approximate total combined-follower count for a creator across their
+// handles in the admin Insights overview tile. Legacy values included.
 function parseFollowerMidpoint(range: string | null | undefined): number {
   if (!range) return 0;
   const r = range.toLowerCase().replace(/\s/g, '');
-  // handles formats like "100k+", "100k_plus", "100k-", "100000+"
-  if (r.includes('100k') || r.includes('100,000') || r.includes('million') || r.includes('1m')) return 150000;
-  // handles "10k-100k", "10k_100k", "10k"
-  if (r.includes('10k') || r.includes('10,000')) return 55000;
-  // handles "1k-10k", "1k_10k", "1k"
-  if (r.includes('1k') || r.includes('1,000')) return 5500;
-  return 500; // 0–1K default
+  const map: Record<string, number> = {
+    // current canonical buckets
+    '1k-10k':    5500,
+    '10k-50k':   30000,
+    '50k-100k':  75000,
+    '100k-500k': 300000,
+    '500k-1m':   750000,
+    '1m+':       5000000,
+    // legacy
+    '0-1k':      500,
+    '1m-5m':     3000000,
+    '5m-10m':    7500000,
+    '10m+':      10000000,
+    '1m-10m':    5000000,
+  };
+  return map[r] || 0;
 }
 
 function formatBig(n: number): string {

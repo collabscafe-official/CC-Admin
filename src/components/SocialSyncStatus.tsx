@@ -10,6 +10,16 @@ const apiHeaders = (): Record<string, string> => ({
 });
 
 type Status = 'all' | 'ok' | 'not_found' | 'failed' | 'pending';
+type Platform = 'youtube' | 'tiktok';
+
+// For YouTube, a SocialStats row = "URL was added and we successfully fetched
+// stats." For TikTok, a row only exists after the creator completed OAuth (the
+// callback writes it). So filtering by platform=tiktok answers "which creators
+// have connected TikTok."
+const PLATFORM_META: Record<Platform, { label: string; dot: string; verb: string }> = {
+  youtube: { label: 'YouTube', dot: 'bg-red-500',  verb: 'Re-fetch from YouTube' },
+  tiktok:  { label: 'TikTok',  dot: 'bg-pink-500', verb: 'Re-fetch from TikTok'  },
+};
 
 interface Item {
   _id: string;
@@ -98,7 +108,7 @@ const SocialSyncStatus: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
 
-  const [platform] = useState<string>('youtube');
+  const [platform, setPlatform] = useState<Platform>('youtube');
   const [status, setStatus] = useState<Status>('all');
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -196,11 +206,23 @@ const SocialSyncStatus: React.FC = () => {
 
       {/* Filters bar */}
       <div className="flex flex-wrap gap-3 mb-4 items-center">
-        {/* Platform pill (only YouTube for now) */}
-        <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-dark-700 text-xs font-medium">
-          <span className="w-2 h-2 rounded-full bg-red-500" />
-          YouTube
-        </span>
+        {/* Platform toggle */}
+        <div className="flex gap-1 bg-dark-800 border border-dark-700 rounded-lg p-1">
+          {(Object.keys(PLATFORM_META) as Platform[]).map((p) => (
+            <button
+              key={p}
+              onClick={() => { setPlatform(p); setPage(1); }}
+              className={`inline-flex items-center gap-2 px-3 py-1 rounded text-xs font-medium transition-colors ${
+                platform === p
+                  ? 'bg-primary text-white'
+                  : 'text-gray-400 hover:text-white hover:bg-dark-700'
+              }`}
+            >
+              <span className={`w-2 h-2 rounded-full ${PLATFORM_META[p].dot}`} />
+              {PLATFORM_META[p].label}
+            </button>
+          ))}
+        </div>
 
         {/* Status filter */}
         <div className="flex gap-1 bg-dark-800 border border-dark-700 rounded-lg p-1">
@@ -314,7 +336,7 @@ const SocialSyncStatus: React.FC = () => {
                         onClick={() => handleRefreshOne(item)}
                         disabled={refreshing === item._id || !item.creator}
                         className="px-2 py-1 text-xs rounded bg-dark-700 hover:bg-primary hover:text-white text-gray-300 transition-colors disabled:opacity-50"
-                        title="Re-fetch from YouTube"
+                        title={PLATFORM_META[platform].verb}
                       >
                         {refreshing === item._id ? '…' : '↻ Refresh'}
                       </button>

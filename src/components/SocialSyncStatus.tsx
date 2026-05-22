@@ -43,6 +43,50 @@ interface Item {
   oauthConnected: boolean;
 }
 
+// OAuth attempt row — what the OAuthAttempt audit collection returns hydrated.
+// One per callback hit (success or failure).
+interface OAuthAttemptItem {
+  _id: string;
+  creator: { _id: string; username: string; name: string; profile_image?: string } | null;
+  platform: 'instagram' | 'tiktok';
+  outcome:
+    | 'success'
+    | 'stats_fetch_failed'
+    | 'access_denied'
+    | 'no_pages'
+    | 'no_ig_linked'
+    | 'token_exchange_failed'
+    | 'invalid_state'
+    | 'missing_params'
+    | 'unknown';
+  errorMessage: string;
+  metaCode: number | null;
+  attemptedAt: string;
+}
+
+interface OAuthAttemptsResponse {
+  items: OAuthAttemptItem[];
+  total: number;
+  page: number;
+  limit: number;
+  summary: Record<string, number>;
+}
+
+// Friendly labels + badge colors per outcome
+const OUTCOME_META: Record<OAuthAttemptItem['outcome'], { label: string; bg: string; text: string }> = {
+  success:                { label: 'Success',              bg: 'bg-green-500/15',   text: 'text-green-400' },
+  stats_fetch_failed:     { label: 'Stats Fetch Failed',   bg: 'bg-amber-500/15',   text: 'text-amber-400' },
+  access_denied:          { label: 'Permissions Denied',   bg: 'bg-red-500/15',     text: 'text-red-400'   },
+  no_pages:               { label: 'No FB Pages',          bg: 'bg-orange-500/15',  text: 'text-orange-400'},
+  no_ig_linked:           { label: 'No IG Business Linked',bg: 'bg-orange-500/15',  text: 'text-orange-400'},
+  token_exchange_failed:  { label: 'Token Exchange Failed',bg: 'bg-red-500/15',     text: 'text-red-400'   },
+  invalid_state:          { label: 'Invalid State (CSRF)', bg: 'bg-gray-500/15',    text: 'text-gray-400'  },
+  missing_params:         { label: 'Missing Params',       bg: 'bg-gray-500/15',    text: 'text-gray-400'  },
+  unknown:                { label: 'Unknown',              bg: 'bg-gray-500/15',    text: 'text-gray-400'  },
+};
+
+type View = 'sync' | 'attempts';
+
 interface ApiResponse {
   items: Item[];
   total: number;
@@ -122,6 +166,12 @@ const SocialSyncStatus: React.FC = () => {
   const [sort, setSort] = useState<'lastSyncedAt' | 'score' | 'followers'>('lastSyncedAt');
   const [refreshing, setRefreshing] = useState<string>(''); // _id currently refreshing
 
+  // View toggle — 'sync' (existing table) vs 'attempts' (OAuth audit log)
+  const [view, setView] = useState<View>('sync');
+  const [attemptsData, setAttemptsData] = useState<OAuthAttemptsResponse | null>(null);
+  const [attemptsLoading, setAttemptsLoading] = useState(false);
+  const [attemptsOutcome, setAttemptsOutcome] = useState<string>('all');
+
   // Debounce search input
   useEffect(() => {
     const t = setTimeout(() => {
@@ -160,8 +210,41 @@ const SocialSyncStatus: React.FC = () => {
   }, [platform, status, debouncedSearch, page, limit, sort]);
 
   useEffect(() => {
-    fetchList();
-  }, [fetchList]);
+    if (view === 'sync') fetchList();
+  }, [fetchList, view]);
+
+  // OAuth Attempts fetch — runs when view='attempts' and platform/outcome/page changes.
+  // YouTube isn't in the audit (no OAuth flow), so we silently swap to instagram.
+  const fetchAttempts = useCallback(async () => {
+    setAttemptsLoading(true);
+    setError('');
+    try {
+      const effectivePlatform = platform === 'youtube' ? 'instagram' : platform;
+      const params = new URLSearchParams({
+        platform: effectivePlatform,
+        outcome: attemptsOutcome,
+        page: String(page),
+        limit: String(limit),
+      });
+      const res = await fetch(`${BASE}/social/admin/oauth-attempts?${params}`, {
+        headers: apiHeaders(),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `HTTP ${res.status}`);
+      }
+      const body = (await res.json()) as OAuthAttemptsResponse;
+      setAttemptsData(body);
+    } catch (e: any) {
+      setError(e.message || 'Failed to load OAuth attempts');
+    } finally {
+      setAttemptsLoading(false);
+    }
+  }, [platform, attemptsOutcome, page, limit]);
+
+  useEffect(() => {
+    if (view === 'attempts') fetchAttempts();
+  }, [fetchAttempts, view]);
 
   const handleRefreshOne = async (item: Item) => {
     if (!item.creator) return;
@@ -200,6 +283,29 @@ const SocialSyncStatus: React.FC = () => {
         </p>
       </div>
 
+      {/* View toggle — switches between sync-status table and OAuth attempts audit */}
+      <div className="flex gap-1 bg-dark-800 border border-dark-700 rounded-lg p-1 mb-6 w-fit">
+        <button
+          onClick={() => { setView('sync'); setPage(1); }}
+          className={`px-4 py-1.5 rounded text-sm font-medium transition-colors ${
+            view === 'sync' ? 'bg-primary text-white' : 'text-gray-400 hover:text-white hover:bg-dark-700'
+          }`}
+        >
+          Sync Status
+        </button>
+        <button
+          onClick={() => { setView('attempts'); setPage(1); }}
+          className={`px-4 py-1.5 rounded text-sm font-medium transition-colors ${
+            view === 'attempts' ? 'bg-primary text-white' : 'text-gray-400 hover:text-white hover:bg-dark-700'
+          }`}
+        >
+          OAuth Attempts
+        </button>
+      </div>
+
+      {/* ═══ SYNC STATUS VIEW (existing) ═══ */}
+      {view === 'sync' && (
+      <>
       {/* Summary tiles */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
         <SummaryTile label="Total" value={summary.total ?? 0} color="bg-dark-800 border-dark-700" />
@@ -405,6 +511,27 @@ const SocialSyncStatus: React.FC = () => {
           </div>
         )}
       </div>
+      </>
+      )}
+
+      {/* ═══ OAUTH ATTEMPTS VIEW (new) ═══ */}
+      {view === 'attempts' && (
+        <OAuthAttemptsView
+          BASE={BASE}
+          apiHeaders={apiHeaders}
+          platform={platform === 'youtube' ? 'instagram' : platform}
+          setPlatform={setPlatform}
+          attemptsOutcome={attemptsOutcome}
+          setAttemptsOutcome={setAttemptsOutcome}
+          data={attemptsData}
+          loading={attemptsLoading}
+          error={error}
+          page={page}
+          setPage={setPage}
+          limit={limit}
+          navigate={navigate}
+        />
+      )}
     </div>
   );
 };
@@ -417,5 +544,191 @@ const SummaryTile: React.FC<{ label: string; value: number; color: string }> = (
     <div className="text-2xl font-bold mt-1">{value.toLocaleString()}</div>
   </div>
 );
+
+// OAuth Attempts table — separate component for clarity. Renders the audit
+// log of every OAuth callback for Instagram + TikTok with outcome filter.
+interface OAuthAttemptsViewProps {
+  BASE: string;
+  apiHeaders: () => Record<string, string>;
+  platform: 'instagram' | 'tiktok';
+  setPlatform: (p: Platform) => void;
+  attemptsOutcome: string;
+  setAttemptsOutcome: (o: string) => void;
+  data: OAuthAttemptsResponse | null;
+  loading: boolean;
+  error: string;
+  page: number;
+  setPage: React.Dispatch<React.SetStateAction<number>>;
+  limit: number;
+  navigate: (path: string) => void;
+}
+
+const OAuthAttemptsView: React.FC<OAuthAttemptsViewProps> = ({
+  platform, setPlatform, attemptsOutcome, setAttemptsOutcome,
+  data, loading, error, page, setPage, limit, navigate,
+}) => {
+  const summary = data?.summary || {};
+  const totalPages = data ? Math.max(1, Math.ceil(data.total / data.limit)) : 1;
+
+  // Outcome filter options — derived from OUTCOME_META keys plus "all"
+  const outcomeOptions: Array<{ value: string; label: string }> = [
+    { value: 'all',                    label: 'All' },
+    { value: 'success',                label: 'Success' },
+    { value: 'stats_fetch_failed',     label: 'Stats Fetch Failed' },
+    { value: 'access_denied',          label: 'Permissions Denied' },
+    { value: 'no_pages',               label: 'No FB Pages' },
+    { value: 'no_ig_linked',           label: 'No IG Linked' },
+    { value: 'token_exchange_failed',  label: 'Token Exchange' },
+    { value: 'invalid_state',          label: 'Invalid State' },
+    { value: 'missing_params',         label: 'Missing Params' },
+    { value: 'unknown',                label: 'Unknown' },
+  ];
+
+  return (
+    <>
+      {/* Summary tiles — total + a couple of key outcomes */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
+        <SummaryTile label="Total Attempts" value={summary.total ?? 0} color="bg-dark-800 border-dark-700" />
+        <SummaryTile label="Success"        value={summary.success ?? 0} color="bg-green-500/10 border-green-500/30 text-green-300" />
+        <SummaryTile label="No FB Pages"    value={summary.no_pages ?? 0} color="bg-orange-500/10 border-orange-500/30 text-orange-300" />
+        <SummaryTile label="Denied"         value={summary.access_denied ?? 0} color="bg-red-500/10 border-red-500/30 text-red-300" />
+        <SummaryTile label="Other Failures" value={
+          (summary.no_ig_linked ?? 0) +
+          (summary.token_exchange_failed ?? 0) +
+          (summary.stats_fetch_failed ?? 0) +
+          (summary.unknown ?? 0)
+        } color="bg-amber-500/10 border-amber-500/30 text-amber-300" />
+      </div>
+
+      {/* Filters bar */}
+      <div className="flex flex-wrap gap-3 mb-4 items-center">
+        {/* Platform toggle (IG + TT only — YouTube has no OAuth) */}
+        <div className="flex gap-1 bg-dark-800 border border-dark-700 rounded-lg p-1">
+          {(['instagram', 'tiktok'] as const).map((p) => (
+            <button
+              key={p}
+              onClick={() => { setPlatform(p); setPage(1); }}
+              className={`inline-flex items-center gap-2 px-3 py-1 rounded text-xs font-medium transition-colors ${
+                platform === p
+                  ? 'bg-primary text-white'
+                  : 'text-gray-400 hover:text-white hover:bg-dark-700'
+              }`}
+            >
+              <span className={`w-2 h-2 rounded-full ${PLATFORM_META[p].dot}`} />
+              {PLATFORM_META[p].label}
+            </button>
+          ))}
+        </div>
+
+        {/* Outcome filter */}
+        <select
+          value={attemptsOutcome}
+          onChange={(e) => { setAttemptsOutcome(e.target.value); setPage(1); }}
+          className="px-3 py-1.5 bg-dark-800 border border-dark-700 rounded-lg text-sm text-gray-100 focus:outline-none focus:border-primary"
+        >
+          {outcomeOptions.map((o) => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
+        </select>
+      </div>
+
+      {error && (
+        <div className="mb-4 px-4 py-3 bg-red-500/10 border border-red-500/30 rounded-lg text-sm text-red-300">
+          {error}
+        </div>
+      )}
+
+      {/* Attempts table */}
+      <div className="bg-dark-800 border border-dark-700 rounded-lg overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-sm">
+            <thead className="bg-dark-900 border-b border-dark-700">
+              <tr className="text-left text-gray-400">
+                <th className="px-4 py-3 font-medium">Creator</th>
+                <th className="px-4 py-3 font-medium">Outcome</th>
+                <th className="px-4 py-3 font-medium">Error Message</th>
+                <th className="px-4 py-3 font-medium">When</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading && !data && (
+                <tr><td colSpan={4} className="px-4 py-12 text-center text-gray-500">Loading…</td></tr>
+              )}
+              {!loading && data?.items.length === 0 && (
+                <tr><td colSpan={4} className="px-4 py-12 text-center text-gray-500">No OAuth attempts recorded yet</td></tr>
+              )}
+              {data?.items.map((attempt) => {
+                const meta = OUTCOME_META[attempt.outcome] || { label: attempt.outcome, bg: 'bg-gray-500/15', text: 'text-gray-400' };
+                return (
+                  <tr key={attempt._id} className="border-b border-dark-700 hover:bg-dark-700/40 transition-colors">
+                    <td className="px-4 py-3">
+                      {attempt.creator ? (
+                        <button
+                          onClick={() => navigate(`/influencers/${attempt.creator!._id}`)}
+                          className="text-left hover:text-primary transition-colors"
+                        >
+                          <div className="font-medium text-gray-100">@{attempt.creator.username}</div>
+                          <div className="text-xs text-gray-500">{attempt.creator.name}</div>
+                        </button>
+                      ) : (
+                        <span className="text-gray-500">— (invalid state, creator unknown)</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold ${meta.bg} ${meta.text}`}>
+                        {meta.label}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 max-w-md">
+                      {attempt.errorMessage ? (
+                        <div className="text-xs text-gray-400 italic break-words" title={attempt.errorMessage}>
+                          {attempt.errorMessage.length > 100 ? attempt.errorMessage.slice(0, 100) + '…' : attempt.errorMessage}
+                        </div>
+                      ) : (
+                        <span className="text-xs text-gray-500">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-gray-400">{fmtTimeAgo(attempt.attemptedAt)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination */}
+        {data && data.total > limit && (
+          <div className="flex items-center justify-between px-4 py-3 border-t border-dark-700 text-xs text-gray-400">
+            <div>
+              Showing <span className="text-gray-200">{(data.page - 1) * data.limit + 1}</span>
+              –
+              <span className="text-gray-200">{Math.min(data.page * data.limit, data.total)}</span>
+              {' '}of <span className="text-gray-200">{data.total}</span>
+            </div>
+            <div className="flex gap-1">
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="px-3 py-1 rounded bg-dark-700 hover:bg-dark-600 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                ← Prev
+              </button>
+              <span className="px-3 py-1">
+                Page {page} / {totalPages}
+              </span>
+              <button
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page >= totalPages}
+                className="px-3 py-1 rounded bg-dark-700 hover:bg-dark-600 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Next →
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </>
+  );
+};
 
 export default SocialSyncStatus;

@@ -10,15 +10,17 @@ const apiHeaders = (): Record<string, string> => ({
 });
 
 type Status = 'all' | 'ok' | 'not_found' | 'failed' | 'pending';
-type Platform = 'youtube' | 'tiktok';
+type Platform = 'youtube' | 'tiktok' | 'instagram';
 
 // For YouTube, a SocialStats row = "URL was added and we successfully fetched
 // stats." For TikTok, a row only exists after the creator completed OAuth (the
-// callback writes it). So filtering by platform=tiktok answers "which creators
-// have connected TikTok."
+// callback writes it). For Instagram, a row exists either via OAuth callback
+// (/connected-accounts) OR after a refresh that ran BD against the handle.
+// So filtering by platform=instagram answers "which creators have IG stats."
 const PLATFORM_META: Record<Platform, { label: string; dot: string; verb: string }> = {
-  youtube: { label: 'YouTube', dot: 'bg-red-500',  verb: 'Re-fetch from YouTube' },
-  tiktok:  { label: 'TikTok',  dot: 'bg-pink-500', verb: 'Re-fetch from TikTok'  },
+  youtube:   { label: 'YouTube',   dot: 'bg-red-500',     verb: 'Re-fetch from YouTube'   },
+  tiktok:    { label: 'TikTok',    dot: 'bg-pink-500',    verb: 'Re-fetch from TikTok'    },
+  instagram: { label: 'Instagram', dot: 'bg-fuchsia-500', verb: 'Re-fetch from Instagram' },
 };
 
 interface Item {
@@ -36,6 +38,9 @@ interface Item {
   lastSyncedAt: string;
   lastSyncStatus: string;
   lastSyncError: string;
+  // True when the creator OAuth-connected this platform (TikTok or Instagram
+  // via /connected-accounts). Always false for YouTube — no OAuth flow there.
+  oauthConnected: boolean;
 }
 
 interface ApiResponse {
@@ -280,6 +285,7 @@ const SocialSyncStatus: React.FC = () => {
                 <th className="px-4 py-3 font-medium">Creator</th>
                 <th className="px-4 py-3 font-medium">URL</th>
                 <th className="px-4 py-3 font-medium">Status</th>
+                <th className="px-4 py-3 font-medium text-center">OAuth</th>
                 <th className="px-4 py-3 font-medium text-right">Followers</th>
                 <th className="px-4 py-3 font-medium text-center">Score</th>
                 <th className="px-4 py-3 font-medium">Last Synced</th>
@@ -288,10 +294,10 @@ const SocialSyncStatus: React.FC = () => {
             </thead>
             <tbody>
               {loading && !data && (
-                <tr><td colSpan={7} className="px-4 py-12 text-center text-gray-500">Loading…</td></tr>
+                <tr><td colSpan={8} className="px-4 py-12 text-center text-gray-500">Loading…</td></tr>
               )}
               {!loading && data?.items.length === 0 && (
-                <tr><td colSpan={7} className="px-4 py-12 text-center text-gray-500">No matching records</td></tr>
+                <tr><td colSpan={8} className="px-4 py-12 text-center text-gray-500">No matching records</td></tr>
               )}
               {data?.items.map((item) => (
                 <tr key={item._id} className="border-b border-dark-700 hover:bg-dark-700/40 transition-colors">
@@ -327,6 +333,17 @@ const SocialSyncStatus: React.FC = () => {
                     )}
                   </td>
                   <td className="px-4 py-3">{statusBadge(item.lastSyncStatus)}</td>
+                  <td className="px-4 py-3 text-center">
+                    {item.oauthConnected ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-green-500/15 text-green-400">
+                        Connected
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-gray-500/15 text-gray-400">
+                        Manual
+                      </span>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-right text-gray-300">{fmtNumber(item.followers)}</td>
                   <td className="px-4 py-3 text-center">{gradeBadge(item.audienceQualityGrade, item.audienceQualityScore)}</td>
                   <td className="px-4 py-3 text-xs text-gray-400">{fmtTimeAgo(item.lastSyncedAt)}</td>

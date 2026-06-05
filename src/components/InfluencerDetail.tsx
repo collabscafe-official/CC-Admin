@@ -80,6 +80,31 @@ const VerifiedIcon = () => (
   </svg>
 );
 
+// Admin always sees the exact follower count when it exists (e.g. "12.4K").
+// Falls back to the range bucket ("10k-50k" → "10K-50K") only for manual rows
+// added before the verify flow shipped — `follower_count` is null on those.
+function formatFollowerCount(n: number): string {
+  if (typeof n !== 'number' || !Number.isFinite(n) || n < 0) return '';
+  if (n >= 1_000_000) {
+    const m = n / 1_000_000;
+    return `${m % 1 === 0 ? m.toFixed(0) : m.toFixed(1)}M`;
+  }
+  if (n >= 1_000) {
+    const k = n / 1_000;
+    return `${k % 1 === 0 ? k.toFixed(0) : k.toFixed(1)}K`;
+  }
+  return String(n);
+}
+function followerLabel(socialHandle: any): string {
+  if (typeof socialHandle?.follower_count === 'number') {
+    return formatFollowerCount(socialHandle.follower_count);
+  }
+  const r = socialHandle?.follower_range;
+  if (!r) return '';
+  // legacy "1k-10k" → "1K-10K" / "10m+" → "10M+"
+  return r.replace(/k/g, 'K').replace(/m/g, 'M');
+}
+
 const InfluencerDetail: React.FC = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -195,7 +220,7 @@ const InfluencerDetail: React.FC = () => {
                                 className="flex flex-row items-center gap-2 transition-colors hover:text-primary"
                               >
                                 <InstagramIcon />
-                                <span className="text-xs mt-1">{socialHandle.follower_range}</span>
+                                <span className="text-xs mt-1">{followerLabel(socialHandle)}</span>
                               </a>
                             );
                           case 'twitter':
@@ -208,7 +233,7 @@ const InfluencerDetail: React.FC = () => {
                                 className="flex flex-row items-center gap-2 transition-colors hover:text-primary"
                               >
                                 <XIcon />
-                                <span className="text-xs mt-1">{socialHandle.follower_range}</span>
+                                <span className="text-xs mt-1">{followerLabel(socialHandle)}</span>
                               </a>
                             );
                           case 'youtube':
@@ -221,7 +246,7 @@ const InfluencerDetail: React.FC = () => {
                                 className="flex flex-row items-center gap-2 transition-colors hover:text-primary"
                               >
                                 <YouTubeIcon />
-                                <span className="text-xs mt-1">{socialHandle?.follower_range}</span>
+                                <span className="text-xs mt-1">{followerLabel(socialHandle)}</span>
                               </a>
                             );
                           case 'tiktok':
@@ -234,7 +259,7 @@ const InfluencerDetail: React.FC = () => {
                                 className="flex flex-row items-center gap-2 transition-colors hover:text-primary"
                               >
                                 <TikTokIcon />
-                                <span className="text-xs mt-1">{socialHandle.follower_range}</span>
+                                <span className="text-xs mt-1">{followerLabel(socialHandle)}</span>
                               </a>
                             );
                           case 'facebook':
@@ -247,7 +272,7 @@ const InfluencerDetail: React.FC = () => {
                                 className="flex flex-row items-center gap-2 transition-colors hover:text-primary"
                               >
                                 <FacebookIcon />
-                                <span className="text-xs mt-1">{socialHandle.follower_range}</span>
+                                <span className="text-xs mt-1">{followerLabel(socialHandle)}</span>
                               </a>
                             );
                           case 'linkedin':
@@ -260,7 +285,7 @@ const InfluencerDetail: React.FC = () => {
                                 className="flex flex-row items-center gap-2 transition-colors hover:text-primary"
                               >
                                 <LinkedInIcon />
-                                <span className="text-xs mt-1">{socialHandle.follower_range}</span>
+                                <span className="text-xs mt-1">{followerLabel(socialHandle)}</span>
                               </a>
                             );
                           case 'x':
@@ -274,7 +299,7 @@ const InfluencerDetail: React.FC = () => {
                                 className="flex flex-row items-center gap-2 transition-colors hover:text-primary"
                               >
                                 <XIcon />
-                                <span className="text-xs mt-1">{socialHandle.follower_range}</span>
+                                <span className="text-xs mt-1">{followerLabel(socialHandle)}</span>
                               </a>
                             );
                           default:
@@ -291,8 +316,8 @@ const InfluencerDetail: React.FC = () => {
                                 title={socialHandle.url}
                               >
                                 <span className="capitalize font-semibold">{socialHandle.platform || 'Unknown'}</span>
-                                {socialHandle.follower_range && (
-                                  <span className="text-gray-500 dark:text-gray-400">{socialHandle.follower_range}</span>
+                                {followerLabel(socialHandle) && (
+                                  <span className="text-gray-500 dark:text-gray-400">{followerLabel(socialHandle)}</span>
                                 )}
                               </a>
                             );

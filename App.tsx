@@ -24,6 +24,7 @@ const BrandActivitySearches = lazy(() => import('./src/components/BrandActivityS
 const AdminOrders = lazy(() => import('./src/components/AdminOrders'));
 const AdminOrderDetail = lazy(() => import('./src/components/AdminOrderDetail'));
 const AdminDisputes = lazy(() => import('./src/components/AdminDisputes'));
+const AdminTasks = lazy(() => import('./src/components/AdminTasks'));
 const LoginPage = lazy(() => import('./src/components/LoginPage'));
 
 const App: React.FC = () => {
@@ -63,7 +64,9 @@ const Main: React.FC = () => {
                     ? 'Orders'
                     : pathname.startsWith('/disputes')
                       ? 'Disputes'
-                      : 'Dashboard';
+                      : pathname.startsWith('/tasks')
+                        ? 'Tasks'
+                        : 'Dashboard';
 
   const setActiveScreen = (screen: string) => {
     switch (screen) {
@@ -96,6 +99,9 @@ const Main: React.FC = () => {
         break;
       case 'Disputes':
         navigate('/disputes');
+        break;
+      case 'Tasks':
+        navigate('/tasks');
         break;
       case 'Dashboard':
       default:
@@ -141,6 +147,7 @@ const Main: React.FC = () => {
                     <Route path="/orders" element={<AdminOrders />} />
                     <Route path="/orders/:id" element={<AdminOrderDetail />} />
                     <Route path="/disputes" element={<AdminDisputes />} />
+                    <Route path="/tasks" element={<AdminTasks />} />
                     <Route path="/login" element={<Navigate to="/dashboard" replace />} />
                     <Route path="/" element={<Navigate to="/dashboard" replace />} />
                     <Route path="*" element={<Navigate to="/dashboard" replace />} />

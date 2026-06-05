@@ -60,8 +60,8 @@ const AdminTasks: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Filters
-  const [statusFilter, setStatusFilter] = useState<'' | Status>('');
+  // Filters — kanban view always shows all 3 columns, so no status filter here.
+  // (Backend supports it; we just don't expose a UI for it in kanban mode.)
   const [priorityFilter, setPriorityFilter] = useState<'' | Priority>('');
   const [search, setSearch] = useState('');
 
@@ -74,7 +74,6 @@ const AdminTasks: React.FC = () => {
     setError(null);
     try {
       const body: Record<string, any> = {};
-      if (statusFilter) body.status = statusFilter;
       if (priorityFilter) body.priority = priorityFilter;
       if (search.trim()) body.q = search.trim();
       const res = await collabs.post('/admin/tasks/list', body, { params: { page: 1, limit: 500 } });
@@ -89,11 +88,31 @@ const AdminTasks: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [statusFilter, priorityFilter, search]);
+  }, [priorityFilter, search]);
 
   useEffect(() => { fetchTasks(); }, [fetchTasks]);
 
   // ── Mutations ────────────────────────────────────────────────────────────
+
+  // Move a task to a specific status (kanban quick-shift). Optimistic update,
+  // revert on server error.
+  const changeStatus = async (task: TaskRow, nextStatus: Status) => {
+    if (task.status === nextStatus) return;
+    setTasks((prev) =>
+      prev.map((t) =>
+        t._id === task._id
+          ? { ...t, status: nextStatus, done: nextStatus === 'done' }
+          : t
+      )
+    );
+    try {
+      await collabs.post('/admin/tasks/update', { id: task._id, status: nextStatus });
+      await fetchTasks();
+    } catch {
+      await fetchTasks(); // revert via re-fetch on failure
+    }
+  };
+
   const toggleDone = async (task: TaskRow) => {
     // Optimistic flip
     setTasks((prev) =>
@@ -150,33 +169,9 @@ const AdminTasks: React.FC = () => {
         </button>
       </div>
 
-      {/* Filter bar */}
+      {/* Filter bar — kanban view shows all 3 status columns side by side,
+          so the status tabs are gone. Priority + search still useful. */}
       <div className="flex flex-wrap items-center gap-3 mb-6">
-        {/* Status tabs */}
-        <div className="flex bg-dark-800 rounded-lg overflow-hidden border border-dark-700">
-          {(['', 'todo', 'doing', 'done'] as const).map((s) => {
-            const label =
-              s === '' ? `All (${counts.todo + counts.doing + counts.done})` :
-              s === 'todo' ? `To do (${counts.todo})` :
-              s === 'doing' ? `In progress (${counts.doing})` :
-              `Done (${counts.done})`;
-            return (
-              <button
-                key={s || 'all'}
-                onClick={() => setStatusFilter(s)}
-                className={`px-3 py-1.5 text-xs font-semibold transition-colors ${
-                  statusFilter === s
-                    ? 'bg-emerald-500/15 text-emerald-300'
-                    : 'text-gray-400 hover:text-white'
-                }`}
-              >
-                {label}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Priority filter */}
         <select
           value={priorityFilter}
           onChange={(e) => setPriorityFilter(e.target.value as any)}
@@ -188,7 +183,6 @@ const AdminTasks: React.FC = () => {
           <option value="low">Low</option>
         </select>
 
-        {/* Search */}
         <input
           type="text"
           value={search}
@@ -196,106 +190,125 @@ const AdminTasks: React.FC = () => {
           placeholder="Search title or notes…"
           className="px-3 py-1.5 text-xs bg-dark-800 text-gray-200 border border-dark-700 rounded-lg flex-1 min-w-[200px] max-w-xs"
         />
+
+        <div className="ml-auto text-xs text-gray-500">
+          Total: {counts.todo + counts.doing + counts.done}
+        </div>
       </div>
 
       {loading && <p className="text-sm text-gray-400">Loading…</p>}
       {error && <p className="text-sm text-red-400">{error}</p>}
 
-      {!loading && !error && tasks.length === 0 && (
-        <div className="text-center py-16 text-gray-500">
-          <p className="text-base mb-2">No tasks match your filters.</p>
-          <p className="text-sm">Adjust the filters or create a new task.</p>
-        </div>
-      )}
-
-      {/* Task list — single column, grouped or flat depending on filter */}
-      {!loading && !error && tasks.length > 0 && (
-        <div className="space-y-3">
+      {/* Kanban grid — 3 columns side by side on md+, stacks to 1 column on mobile */}
+      {!loading && !error && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
           {(['todo', 'doing', 'done'] as Status[]).map((bucket) => {
             const items = grouped[bucket];
-            if (items.length === 0) return null;
-            // If a status filter is active, suppress the section heading (redundant)
-            const showHeading = !statusFilter;
+            const meta = STATUS_STYLES[bucket];
             return (
-              <div key={bucket}>
-                {showHeading && (
-                  <div className="flex items-center gap-2 mt-6 mb-2">
-                    <span className={`w-2 h-2 rounded-full ${STATUS_STYLES[bucket].dot}`} />
-                    <h2 className="text-xs font-bold uppercase tracking-wider text-gray-400">
-                      {STATUS_STYLES[bucket].label} · {items.length}
+              <div key={bucket} className="bg-dark-900/40 rounded-lg p-3 min-h-[200px] border border-dark-800/50">
+                {/* Column header */}
+                <div className="flex items-center justify-between mb-3 px-1">
+                  <div className="flex items-center gap-2">
+                    <span className={`w-2 h-2 rounded-full ${meta.dot}`} />
+                    <h2 className="text-xs font-bold uppercase tracking-wider text-gray-300">
+                      {meta.label}
                     </h2>
+                    <span className="text-[10px] font-bold text-gray-500 bg-dark-800 px-1.5 py-0.5 rounded">
+                      {items.length}
+                    </span>
                   </div>
-                )}
+                </div>
+
+                {/* Cards */}
                 <div className="space-y-2">
+                  {items.length === 0 && (
+                    <div className="text-center py-6 text-xs text-gray-600 italic">
+                      No tasks
+                    </div>
+                  )}
                   {items.map((t) => (
                     <div
                       key={t._id}
-                      className={`p-4 bg-dark-800 border border-dark-700 rounded-lg flex items-start gap-3 hover:border-emerald-500/30 transition-colors ${
+                      className={`p-3 bg-dark-800 border border-dark-700 rounded-lg hover:border-emerald-500/30 transition-colors group ${
                         t.done ? 'opacity-60' : ''
                       }`}
                     >
-                      {/* Checkbox / toggle */}
-                      <button
-                        onClick={() => toggleDone(t)}
-                        className={`flex-shrink-0 mt-0.5 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
-                          t.done
-                            ? 'bg-emerald-500 border-emerald-500'
-                            : 'border-gray-500 hover:border-emerald-400'
-                        }`}
-                        aria-label={t.done ? 'Mark as not done' : 'Mark as done'}
-                      >
-                        {t.done && (
-                          <svg className="w-3 h-3 text-white" viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                          </svg>
-                        )}
-                      </button>
-
-                      {/* Title + meta */}
-                      <div className="flex-1 min-w-0">
-                        <div className={`text-sm font-medium ${t.done ? 'line-through text-gray-500' : 'text-white'}`}>
-                          {t.title}
-                        </div>
-                        {t.notes && (
-                          <div className="text-xs text-gray-400 mt-1 whitespace-pre-wrap">{t.notes}</div>
-                        )}
-                        <div className="flex items-center gap-2 mt-2 flex-wrap">
-                          <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${PRIORITY_STYLES[t.priority].chip}`}>
-                            {PRIORITY_STYLES[t.priority].label}
-                          </span>
-                          <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${STATUS_STYLES[t.status].chip}`}>
-                            {STATUS_STYLES[t.status].label}
-                          </span>
-                          {t.created_at && (
-                            <span className="text-[10px] text-gray-500">
-                              Created {formatDateTime(t.created_at)}
-                            </span>
-                          )}
-                          {t.legacy_id && (
-                            <span className="text-[10px] text-gray-600" title="Migrated from local task manager">
-                              · legacy:{t.legacy_id.slice(0, 6)}
-                            </span>
-                          )}
+                      {/* Top row: priority chip + actions (visible on hover) */}
+                      <div className="flex items-center justify-between mb-2 gap-2">
+                        <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${PRIORITY_STYLES[t.priority].chip}`}>
+                          {PRIORITY_STYLES[t.priority].label}
+                        </span>
+                        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={() => setEditing(t)}
+                            className="p-1 text-gray-500 hover:text-white hover:bg-dark-700 rounded transition-colors"
+                            title="Edit"
+                            aria-label="Edit task"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                          </button>
+                          <button
+                            onClick={() => removeTask(t)}
+                            className="p-1 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded transition-colors"
+                            title="Delete"
+                            aria-label="Delete task"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3" />
+                            </svg>
+                          </button>
                         </div>
                       </div>
 
-                      {/* Actions */}
-                      <div className="flex items-center gap-1 flex-shrink-0">
-                        <button
-                          onClick={() => setEditing(t)}
-                          className="px-2 py-1 text-xs text-gray-400 hover:text-white hover:bg-dark-700 rounded transition-colors"
-                          title="Edit"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => removeTask(t)}
-                          className="px-2 py-1 text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded transition-colors"
-                          title="Delete"
-                        >
-                          Delete
-                        </button>
+                      {/* Title */}
+                      <div className={`text-sm font-medium leading-snug ${t.done ? 'line-through text-gray-500' : 'text-white'}`}>
+                        {t.title}
                       </div>
+
+                      {/* Notes */}
+                      {t.notes && (
+                        <div className="text-xs text-gray-400 mt-1.5 whitespace-pre-wrap line-clamp-3">
+                          {t.notes}
+                        </div>
+                      )}
+
+                      {/* Bottom row: quick-move buttons */}
+                      <div className="flex items-center justify-between mt-3 pt-2 border-t border-dark-700/50">
+                        {bucket !== 'todo' ? (
+                          <button
+                            onClick={() => changeStatus(t, bucket === 'doing' ? 'todo' : 'doing')}
+                            className="p-1 text-[10px] text-gray-500 hover:text-emerald-400 transition-colors flex items-center gap-1"
+                            title={`Move to ${bucket === 'doing' ? 'To do' : 'In progress'}`}
+                          >
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                            </svg>
+                            <span>{bucket === 'doing' ? 'To do' : 'In progress'}</span>
+                          </button>
+                        ) : <span />}
+
+                        {bucket !== 'done' ? (
+                          <button
+                            onClick={() => changeStatus(t, bucket === 'todo' ? 'doing' : 'done')}
+                            className="p-1 text-[10px] text-gray-500 hover:text-emerald-400 transition-colors flex items-center gap-1"
+                            title={`Move to ${bucket === 'todo' ? 'In progress' : 'Done'}`}
+                          >
+                            <span>{bucket === 'todo' ? 'In progress' : 'Done'}</span>
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
+                          </button>
+                        ) : <span />}
+                      </div>
+
+                      {t.legacy_id && (
+                        <div className="text-[9px] text-gray-700 mt-1.5" title="Migrated from local task manager">
+                          legacy:{t.legacy_id.slice(0, 6)}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

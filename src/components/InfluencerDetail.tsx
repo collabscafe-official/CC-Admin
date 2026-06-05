@@ -5,6 +5,7 @@ import { approveCreator, getCreators } from '../store/actions/creatorAction';
 import PackagesSection from './PackagesSection';
 import ContentHighlights from './ContentHighlights';
 import FaqsSection from './FaqsSection';
+import TrustLensAdminPanel from './TrustLensAdminPanel';
 
 const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
   const baseClasses = "px-2 py-1 text-xs font-medium rounded-full inline-block";
@@ -349,6 +350,12 @@ const InfluencerDetail: React.FC = () => {
       {influencer?.pricings && influencer?.pricings?.length > 0 && (
         <div className="mt-8">
             <PackagesSection packages={influencer.pricings} />
+        </div>
+      )}
+      {/* TrustLens AI inline diagnostic — shown for every reviewed creator */}
+      {influencer?._id && (
+        <div className="mt-8">
+          <TrustLensAdminPanel identifier={influencer._id} />
         </div>
       )}
       {influencer?.portfolio && influencer?.portfolio?.length > 0 && (

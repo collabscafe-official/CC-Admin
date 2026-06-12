@@ -138,6 +138,13 @@ const EVENT_LABELS: Record<string, string> = {
   submission_reviewed: '🔍 Reviewed submission',
   revision_requested: '↩ Requested revision',
   submission_approved: '👍 Approved submission',
+  // Custom Offers funnel
+  custom_offer_compose_opened: '✏️ Opened custom offer compose',
+  custom_offer_submitted: '📨 Sent custom offer',
+  custom_offer_submit_failed: '⚠️ Custom offer submit failed',
+  custom_offer_inbox_viewed: '📥 Viewed custom offers inbox',
+  custom_offer_cancelled: '🗙 Cancelled custom offer',
+  custom_offer_checkout_started: '💳 Started custom-offer checkout',
 };
 
 function eventLabel(t: string): string {

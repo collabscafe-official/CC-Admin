@@ -24,6 +24,7 @@ const BrandActivitySearches = lazy(() => import('./src/components/BrandActivityS
 const AdminOrders = lazy(() => import('./src/components/AdminOrders'));
 const AdminOrderDetail = lazy(() => import('./src/components/AdminOrderDetail'));
 const AdminDisputes = lazy(() => import('./src/components/AdminDisputes'));
+const AdminCustomOffers = lazy(() => import('./src/components/AdminCustomOffers'));
 const AdminTasks = lazy(() => import('./src/components/AdminTasks'));
 const LoginPage = lazy(() => import('./src/components/LoginPage'));
 
@@ -64,9 +65,11 @@ const Main: React.FC = () => {
                     ? 'Orders'
                     : pathname.startsWith('/disputes')
                       ? 'Disputes'
-                      : pathname.startsWith('/tasks')
-                        ? 'Tasks'
-                        : 'Dashboard';
+                      : pathname.startsWith('/custom-offers')
+                        ? 'Custom Offers'
+                        : pathname.startsWith('/tasks')
+                          ? 'Tasks'
+                          : 'Dashboard';
 
   const setActiveScreen = (screen: string) => {
     switch (screen) {
@@ -99,6 +102,9 @@ const Main: React.FC = () => {
         break;
       case 'Disputes':
         navigate('/disputes');
+        break;
+      case 'Custom Offers':
+        navigate('/custom-offers');
         break;
       case 'Tasks':
         navigate('/tasks');
@@ -147,6 +153,7 @@ const Main: React.FC = () => {
                     <Route path="/orders" element={<AdminOrders />} />
                     <Route path="/orders/:id" element={<AdminOrderDetail />} />
                     <Route path="/disputes" element={<AdminDisputes />} />
+                    <Route path="/custom-offers" element={<AdminCustomOffers />} />
                     <Route path="/tasks" element={<AdminTasks />} />
                     <Route path="/login" element={<Navigate to="/dashboard" replace />} />
                     <Route path="/" element={<Navigate to="/dashboard" replace />} />

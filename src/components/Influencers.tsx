@@ -282,6 +282,58 @@ const useDebounce = (value: string, delay: number) => {
   return debouncedValue;
 };
 
+// ── Filter-state persistence ──────────────────────────────────────────────────
+// Survives navigation to /influencers/:id and back (e.g., approval loop where the
+// admin opens a profile, approves, gets bounced to the list, and would otherwise
+// have to re-apply every filter). sessionStorage (not localStorage) so a fresh
+// admin session starts clean — but every filter persists across the approval
+// click → list → next profile loop.
+
+const FILTER_STORAGE_KEY = 'cc-admin-influencers-filter-state';
+
+const DEFAULT_FILTERS = {
+  is_active:            '',
+  is_email_verified:    '',
+  is_profile_completed: '',
+  is_approved_by_admin: '',
+  is_featured:          '',
+  country:              '',
+  state:                '',
+  city:                 '',
+  gender:               '',
+  status:               'All',
+};
+
+interface PersistedFilterState {
+  searchQuery:  string;
+  currentPage:  number;
+  itemsPerPage: number;
+  view:         'table' | 'cards';
+  showFilters:  boolean;
+  filters:      typeof DEFAULT_FILTERS;
+  countryId:    string;
+  stateId:      string;
+  cityId:       string;
+}
+
+function loadFilterState(): Partial<PersistedFilterState> | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.sessionStorage.getItem(FILTER_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+function saveFilterState(state: PersistedFilterState) {
+  if (typeof window === 'undefined') return;
+  try { window.sessionStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify(state)); } catch { /* ignore */ }
+}
+
+function clearFilterStorage() {
+  if (typeof window === 'undefined') return;
+  try { window.sessionStorage.removeItem(FILTER_STORAGE_KEY); } catch { /* ignore */ }
+}
+
 // ── Main component ─────────────────────────────────────────────────────────────
 
 const Influencers: React.FC = () => {
@@ -291,32 +343,24 @@ const Influencers: React.FC = () => {
   const navigate  = useNavigate();
   const location  = useLocation() as any;
 
-  const [searchQuery,        setSearchQuery]        = useState('');
-  const [currentPage,        setCurrentPage]        = useState(location.state?.currentPage || 1);
-  const [itemsPerPage,       setItemsPerPage]       = useState(location.state?.itemsPerPage || 10);
+  // Load persisted state ONCE on mount. Subsequent renders won't re-hit storage.
+  const persisted = useMemo(() => loadFilterState(), []);
+
+  const [searchQuery,        setSearchQuery]        = useState<string>(persisted?.searchQuery ?? '');
+  const [currentPage,        setCurrentPage]        = useState<number>(persisted?.currentPage ?? location.state?.currentPage ?? 1);
+  const [itemsPerPage,       setItemsPerPage]       = useState<number>(persisted?.itemsPerPage ?? location.state?.itemsPerPage ?? 10);
   const [isDeleteModalOpen,  setDeleteModalOpen]    = useState(false);
   const [influencerToDelete, setInfluencerToDelete] = useState<Influencer | null>(null);
   const [isLoading,          setIsLoading]          = useState(true);
-  const [view,               setView]               = useState<'table' | 'cards'>('table');
-  const [showFilters,        setShowFilters]        = useState(false);
+  const [view,               setView]               = useState<'table' | 'cards'>(persisted?.view ?? 'table');
+  const [showFilters,        setShowFilters]        = useState<boolean>(persisted?.showFilters ?? false);
   const isRestoringFromNavigation = useRef(false);
 
-  const [filters, setFilters] = useState({
-    is_active:            '',
-    is_email_verified:    '',
-    is_profile_completed: '',
-    is_approved_by_admin: '',
-    is_featured:          '',
-    country:              '',
-    state:                '',
-    city:                 '',
-    gender:               '',
-    status:               'All',
-  });
+  const [filters, setFilters] = useState({ ...DEFAULT_FILTERS, ...(persisted?.filters || {}) });
 
-  const [countryId, setCountryId] = useState('');
-  const [stateId,   setStateId]   = useState('');
-  const [cityId,    setCityId]    = useState('');
+  const [countryId, setCountryId] = useState<string>(persisted?.countryId ?? '');
+  const [stateId,   setStateId]   = useState<string>(persisted?.stateId   ?? '');
+  const [cityId,    setCityId]    = useState<string>(persisted?.cityId    ?? '');
 
   const debouncedCountry = useDebounce(filters.country, 500);
   const debouncedState   = useDebounce(filters.state,   500);
@@ -357,10 +401,21 @@ const Influencers: React.FC = () => {
   };
 
   const clearFilters = () => {
-    setFilters({ is_active: '', is_email_verified: '', is_profile_completed: '', is_approved_by_admin: '', is_featured: '', country: '', state: '', city: '', gender: '', status: 'All' });
+    setFilters({ ...DEFAULT_FILTERS });
     setCountryId(''); setStateId(''); setCityId('');
     setSearchQuery(''); setCurrentPage(1);
+    clearFilterStorage(); // Drop the persisted snapshot too — Clear means clear.
   };
+
+  // Persist filter state on every change so the approval-loop workflow
+  // (list → profile → approve → back to list) restores filters without
+  // the admin having to re-apply them.
+  useEffect(() => {
+    saveFilterState({
+      searchQuery, currentPage, itemsPerPage, view, showFilters,
+      filters, countryId, stateId, cityId,
+    });
+  }, [searchQuery, currentPage, itemsPerPage, view, showFilters, filters, countryId, stateId, cityId]);
 
   // ── Effects ──
 

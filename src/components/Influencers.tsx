@@ -93,6 +93,48 @@ function capitalize(str: string): string {
   return str.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
 }
 
+// Renders a "TrustLens: 3d ago" pill that tints by staleness. The auto-resync
+// scheduler runs every 14 days; we color amber after 20 days (cycle missed)
+// and red after 35 days (two cycles missed — actual problem).
+// Only shown for approved+active creators (the only ones the resync touches).
+function TrustLensFreshness({ inf }: { inf: any }) {
+  if (!inf?.is_approved_by_admin || !inf?.is_active) return null;
+  const ts = inf?.trustLensLastSyncedAt;
+  if (!ts) {
+    return (
+      <span style={{
+        display: 'inline-flex', alignItems: 'center', gap: 4,
+        padding: '2px 8px', borderRadius: 999, fontSize: 11, fontWeight: 600,
+        background: 'rgba(107,114,128,0.15)', color: '#9ca3af', border: '1px solid rgba(107,114,128,0.25)',
+      }} title="No TrustLens sync recorded yet">
+        TrustLens: never
+      </span>
+    );
+  }
+  const ageMs = Date.now() - new Date(ts).getTime();
+  const ageDays = Math.floor(ageMs / (24 * 60 * 60 * 1000));
+  const label =
+    ageMs < 60 * 60 * 1000   ? 'just now' :
+    ageMs < 24 * 60 * 60 * 1000 ? `${Math.floor(ageMs / (60 * 60 * 1000))}h ago` :
+    `${ageDays}d ago`;
+  // Color thresholds: <20d green, 20-35d amber, >35d red
+  let bg = 'rgba(34,197,94,0.12)', col = '#86efac', bd = 'rgba(34,197,94,0.25)';
+  if (ageDays > 35)      { bg = 'rgba(239,68,68,0.15)';  col = '#fca5a5'; bd = 'rgba(239,68,68,0.3)'; }
+  else if (ageDays > 20) { bg = 'rgba(245,158,11,0.15)'; col = '#fcd34d'; bd = 'rgba(245,158,11,0.3)'; }
+  return (
+    <span
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: 4,
+        padding: '2px 8px', borderRadius: 999, fontSize: 11, fontWeight: 600,
+        background: bg, color: col, border: `1px solid ${bd}`, whiteSpace: 'nowrap',
+      }}
+      title={`TrustLens last synced ${new Date(ts).toLocaleString()}`}
+    >
+      TrustLens: {label}
+    </span>
+  );
+}
+
 function getPageRange(current: number, total: number): Array<number | 'gap'> {
   if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
   const pages: Array<number | 'gap'> = [];
@@ -767,9 +809,12 @@ const Influencers: React.FC = () => {
                         <td style={{ padding: '12px 16px' }}>
                           <StatusBadge status={inf.is_profile_completed ? 'Complete' : 'Incomplete'} />
                         </td>
-                        {/* Approval */}
+                        {/* Approval + TrustLens freshness */}
                         <td style={{ padding: '12px 16px' }}>
-                          <StatusBadge status={inf.is_approved_by_admin ? 'Approved' : 'Not Approved'} />
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
+                            <StatusBadge status={inf.is_approved_by_admin ? 'Approved' : 'Not Approved'} />
+                            <TrustLensFreshness inf={inf} />
+                          </div>
                         </td>
                         {/* Joined */}
                         <td style={{ padding: '12px 16px', color: '#9ca3af', whiteSpace: 'nowrap', fontSize: 12 }}>
@@ -842,6 +887,7 @@ const Influencers: React.FC = () => {
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                         <StatusBadge status={inf.is_profile_completed ? 'Complete' : 'Incomplete'} />
                         {!inf.is_active && <StatusBadge status="Inactive" />}
+                        <TrustLensFreshness inf={inf} />
                       </div>
 
                     </div>

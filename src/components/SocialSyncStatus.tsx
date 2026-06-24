@@ -85,7 +85,65 @@ const OUTCOME_META: Record<OAuthAttemptItem['outcome'], { label: string; bg: str
   unknown:                { label: 'Unknown',              bg: 'bg-gray-500/15',    text: 'text-gray-400'  },
 };
 
-type View = 'sync' | 'attempts';
+type View = 'sync' | 'attempts' | 'auto-resync';
+
+// ── TrustLens auto-resync types ──────────────────────────────────────────────
+
+interface PlatformCounter {
+  eligible: number;
+  processed: number;
+  succeeded: number;
+  failed: number;
+  skipped: number;
+  last_processed_index: number;
+}
+
+interface SyncRun {
+  _id: string;
+  status: 'queued' | 'running' | 'completed' | 'partial' | 'failed';
+  triggered_by: 'cron' | 'admin_manual';
+  triggered_by_user?: string;
+  started_at: string | null;
+  finished_at: string | null;
+  duration_ms: number | null;
+  scope_creators_eligible: number;
+  instagram?: PlatformCounter;
+  youtube?: PlatformCounter;
+  tiktok?: PlatformCounter;
+  errors?: Array<{ creator_id: string; username: string; platform: string; message: string; at: string }>;
+  notes?: string;
+  createdAt: string;
+}
+
+interface IGRateLimitState {
+  daily_cap: number;
+  calls_in_window: number;
+  window_started_at: string | null;
+  last_call_ended_at: string | null;
+  in_backoff: boolean;
+  backoff_until: string | null;
+  backoff_level: number;
+  min_interval_ms: number;
+}
+
+interface RecentSyncRow {
+  _id: string;
+  creator: string;
+  platform: string;
+  lastSyncedAt: string;
+  lastSyncStatus: string;
+  lastSyncSource?: string;
+  creator_profile: { _id: string; username: string; name: string; profile_picture?: string } | null;
+}
+
+interface AutoSyncStatusResponse {
+  latest_run: SyncRun | null;
+  is_running: boolean;
+  running_run: SyncRun | null;
+  next_scheduled_at: string;
+  ig_rate_limit: IGRateLimitState;
+  recent_syncs: RecentSyncRow[];
+}
 
 interface ApiResponse {
   items: Item[];
@@ -301,6 +359,14 @@ const SocialSyncStatus: React.FC = () => {
         >
           OAuth Attempts
         </button>
+        <button
+          onClick={() => { setView('auto-resync'); setPage(1); }}
+          className={`px-4 py-1.5 rounded text-sm font-medium transition-colors ${
+            view === 'auto-resync' ? 'bg-primary text-white' : 'text-gray-400 hover:text-white hover:bg-dark-700'
+          }`}
+        >
+          Auto-Resync
+        </button>
       </div>
 
       {/* ═══ SYNC STATUS VIEW (existing) ═══ */}
@@ -512,6 +578,11 @@ const SocialSyncStatus: React.FC = () => {
         )}
       </div>
       </>
+      )}
+
+      {/* ═══ AUTO-RESYNC VIEW (TrustLens scheduler) ═══ */}
+      {view === 'auto-resync' && (
+        <TrustLensAutoSyncView BASE={BASE} apiHeaders={apiHeaders} navigate={navigate} />
       )}
 
       {/* ═══ OAUTH ATTEMPTS VIEW (new) ═══ */}
@@ -728,6 +799,453 @@ const OAuthAttemptsView: React.FC<OAuthAttemptsViewProps> = ({
         )}
       </div>
     </>
+  );
+};
+
+// ── TrustLens Auto-Resync panel ───────────────────────────────────────────
+// Surfaces the scheduler state (next run, current/last run, IG rate-limit
+// quota), lets the admin manually trigger a run, and shows recent per-creator
+// sync activity. Polls /status every 30s so a running sync's progress
+// counters refresh without a manual reload.
+
+interface TrustLensAutoSyncViewProps {
+  BASE: string;
+  apiHeaders: () => Record<string, string>;
+  navigate: (path: string) => void;
+}
+
+const TrustLensAutoSyncView: React.FC<TrustLensAutoSyncViewProps> = ({ BASE, apiHeaders, navigate }) => {
+  const [statusData, setStatusData] = useState<AutoSyncStatusResponse | null>(null);
+  const [history, setHistory] = useState<SyncRun[]>([]);
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyTotal, setHistoryTotal] = useState(0);
+  const [historyLimit] = useState(10);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [triggering, setTriggering] = useState(false);
+  const [expandedRunId, setExpandedRunId] = useState<string | null>(null);
+
+  const fetchStatus = useCallback(async () => {
+    try {
+      const res = await fetch(`${BASE}/social/admin/trustlens-sync/status`, { headers: apiHeaders() });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setStatusData(await res.json());
+    } catch (e: any) {
+      setError(e.message || 'Failed to load status');
+    }
+  }, [BASE, apiHeaders]);
+
+  const fetchHistory = useCallback(async () => {
+    try {
+      const params = new URLSearchParams({ page: String(historyPage), limit: String(historyLimit) });
+      const res = await fetch(`${BASE}/social/admin/trustlens-sync/runs?${params}`, { headers: apiHeaders() });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const body = await res.json();
+      setHistory(body.items || []);
+      setHistoryTotal(body.total || 0);
+    } catch (e: any) {
+      setError(e.message || 'Failed to load history');
+    }
+  }, [BASE, apiHeaders, historyPage, historyLimit]);
+
+  useEffect(() => {
+    setLoading(true);
+    Promise.all([fetchStatus(), fetchHistory()]).finally(() => setLoading(false));
+  }, [fetchStatus, fetchHistory]);
+
+  // Poll while a sync is running so progress counters update live
+  useEffect(() => {
+    if (!statusData?.is_running) return;
+    const interval = setInterval(() => {
+      fetchStatus();
+      fetchHistory();
+    }, 30_000);
+    return () => clearInterval(interval);
+  }, [statusData?.is_running, fetchStatus, fetchHistory]);
+
+  const handleTrigger = async () => {
+    if (statusData?.is_running) {
+      setError('A sync is already running — wait for it to finish or cancel it first.');
+      return;
+    }
+    if (!window.confirm('Manually start a TrustLens sync for all approved creators?\n\nIG calls take ~20s each; a full run can take 30-60 min.')) return;
+    setTriggering(true);
+    setError('');
+    try {
+      const res = await fetch(`${BASE}/social/admin/trustlens-sync/trigger`, {
+        method: 'POST',
+        headers: apiHeaders(),
+        body: JSON.stringify({ notes: 'Manually triggered from CC-Admin' }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `HTTP ${res.status}`);
+      }
+      await fetchStatus();
+      await fetchHistory();
+    } catch (e: any) {
+      setError(e.message || 'Trigger failed');
+    } finally {
+      setTriggering(false);
+    }
+  };
+
+  const handleCancel = async (runId: string) => {
+    if (!window.confirm('Cancel this running sync? In-flight platform calls will still complete, but no new ones will start.')) return;
+    try {
+      const res = await fetch(`${BASE}/social/admin/trustlens-sync/cancel/${runId}`, {
+        method: 'POST',
+        headers: apiHeaders(),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      await fetchStatus();
+      await fetchHistory();
+    } catch (e: any) {
+      setError(e.message || 'Cancel failed');
+    }
+  };
+
+  if (loading) {
+    return <div className="text-center text-gray-500 py-12">Loading auto-resync state…</div>;
+  }
+
+  const lastRun = statusData?.latest_run;
+  const running = statusData?.is_running ? statusData?.running_run : null;
+  const ig = statusData?.ig_rate_limit;
+  const totalHistoryPages = Math.max(1, Math.ceil(historyTotal / historyLimit));
+
+  return (
+    <>
+      {error && (
+        <div className="mb-4 px-4 py-3 bg-red-500/10 border border-red-500/30 rounded-lg text-sm text-red-300">
+          {error}
+        </div>
+      )}
+
+      {/* Status cards row */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-6">
+        {/* Next run */}
+        <div className="px-4 py-3 rounded-lg border bg-dark-800 border-dark-700">
+          <div className="text-xs uppercase tracking-wide opacity-70 font-semibold text-gray-400">Next Scheduled Run</div>
+          <div className="text-lg font-bold mt-1 text-gray-100">
+            {statusData?.next_scheduled_at ? new Date(statusData.next_scheduled_at).toLocaleString('en-PK', { dateStyle: 'medium', timeStyle: 'short' }) : '—'}
+          </div>
+          <div className="text-xs text-gray-500 mt-0.5">Every other Sunday, 03:00 PKT</div>
+        </div>
+
+        {/* Last run */}
+        <div className={`px-4 py-3 rounded-lg border ${runStatusBorder(lastRun?.status)}`}>
+          <div className="text-xs uppercase tracking-wide opacity-70 font-semibold">Last Run</div>
+          {lastRun ? (
+            <>
+              <div className="text-lg font-bold mt-1">
+                {fmtTimeAgo(lastRun.started_at || lastRun.createdAt)} {runStatusBadge(lastRun.status)}
+              </div>
+              <div className="text-xs text-gray-500 mt-0.5">
+                {summarizeRunCounters(lastRun)}
+              </div>
+            </>
+          ) : (
+            <div className="text-sm text-gray-500 mt-1">Never run</div>
+          )}
+        </div>
+
+        {/* IG quota */}
+        <div className="px-4 py-3 rounded-lg border bg-dark-800 border-dark-700">
+          <div className="text-xs uppercase tracking-wide opacity-70 font-semibold text-gray-400">Instagram API Quota</div>
+          <div className="text-lg font-bold mt-1 text-gray-100">
+            {ig ? `${ig.calls_in_window} / ${ig.daily_cap}` : '—'}
+          </div>
+          <div className="text-xs text-gray-500 mt-0.5">
+            {ig?.in_backoff ? (
+              <span className="text-amber-400">Backoff active (level {ig.backoff_level})</span>
+            ) : ig?.last_call_ended_at ? (
+              `Last call: ${fmtTimeAgo(ig.last_call_ended_at)}`
+            ) : (
+              'Idle'
+            )}
+          </div>
+        </div>
+
+        {/* Manual trigger */}
+        <div className="px-4 py-3 rounded-lg border bg-dark-800 border-dark-700 flex flex-col">
+          <div className="text-xs uppercase tracking-wide opacity-70 font-semibold text-gray-400">Manual Trigger</div>
+          <button
+            onClick={handleTrigger}
+            disabled={triggering || !!statusData?.is_running}
+            className="mt-2 px-3 py-2 rounded bg-primary hover:bg-primary/80 text-white text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {triggering ? 'Starting…' : statusData?.is_running ? 'Sync in progress' : 'Start sync now'}
+          </button>
+        </div>
+      </div>
+
+      {/* Running run progress panel */}
+      {running && (
+        <div className="mb-6 px-5 py-4 rounded-lg border border-blue-500/30 bg-blue-500/5">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <div className="text-sm font-semibold text-blue-200 flex items-center gap-2">
+                <span className="inline-block w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
+                Sync in progress
+              </div>
+              <div className="text-xs text-gray-400 mt-0.5">
+                Started {fmtTimeAgo(running.started_at)} · Triggered by {running.triggered_by === 'cron' ? 'scheduler' : `admin (${running.triggered_by_user || 'unknown'})`}
+              </div>
+            </div>
+            <button
+              onClick={() => handleCancel(running._id)}
+              className="px-3 py-1.5 rounded bg-red-500/15 hover:bg-red-500/25 text-red-300 text-xs font-medium transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+          <div className="grid grid-cols-3 gap-3 text-xs">
+            <PlatformProgressBlock label="Instagram" counter={running.instagram} dot="bg-fuchsia-500" />
+            <PlatformProgressBlock label="YouTube"   counter={running.youtube}   dot="bg-red-500" />
+            <PlatformProgressBlock label="TikTok"    counter={running.tiktok}    dot="bg-pink-500" />
+          </div>
+        </div>
+      )}
+
+      {/* History table */}
+      <div className="mb-6">
+        <h3 className="text-sm font-semibold text-gray-300 mb-2">Sync History</h3>
+        <div className="bg-dark-800 border border-dark-700 rounded-lg overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead className="bg-dark-900 border-b border-dark-700">
+                <tr className="text-left text-gray-400">
+                  <th className="px-4 py-3 font-medium">When</th>
+                  <th className="px-4 py-3 font-medium">Trigger</th>
+                  <th className="px-4 py-3 font-medium">Status</th>
+                  <th className="px-4 py-3 font-medium">Eligible</th>
+                  <th className="px-4 py-3 font-medium">Processed</th>
+                  <th className="px-4 py-3 font-medium">Duration</th>
+                  <th className="px-4 py-3 font-medium"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {history.length === 0 && (
+                  <tr><td colSpan={7} className="px-4 py-12 text-center text-gray-500">No sync runs yet</td></tr>
+                )}
+                {history.map((run) => {
+                  const processed = (run.instagram?.processed || 0) + (run.youtube?.processed || 0) + (run.tiktok?.processed || 0);
+                  return (
+                    <React.Fragment key={run._id}>
+                      <tr
+                        className="border-b border-dark-700 hover:bg-dark-700/40 transition-colors cursor-pointer"
+                        onClick={() => setExpandedRunId(expandedRunId === run._id ? null : run._id)}
+                      >
+                        <td className="px-4 py-3 text-xs text-gray-300">
+                          {new Date(run.started_at || run.createdAt).toLocaleString('en-PK', { dateStyle: 'short', timeStyle: 'short' })}
+                        </td>
+                        <td className="px-4 py-3 text-xs">
+                          {run.triggered_by === 'cron'
+                            ? <span className="text-gray-400">Scheduler</span>
+                            : <span className="text-amber-400">Manual</span>
+                          }
+                        </td>
+                        <td className="px-4 py-3">{runStatusBadge(run.status)}</td>
+                        <td className="px-4 py-3 text-xs text-gray-300">{run.scope_creators_eligible}</td>
+                        <td className="px-4 py-3 text-xs text-gray-300">{processed}</td>
+                        <td className="px-4 py-3 text-xs text-gray-300">{fmtDuration(run.duration_ms)}</td>
+                        <td className="px-4 py-3 text-xs text-gray-500">
+                          {expandedRunId === run._id ? '▼' : '▶'}
+                        </td>
+                      </tr>
+                      {expandedRunId === run._id && (
+                        <tr className="bg-dark-900/50">
+                          <td colSpan={7} className="px-4 py-3">
+                            <RunDetailExpanded run={run} navigate={navigate} />
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          {historyTotal > historyLimit && (
+            <div className="flex items-center justify-between px-4 py-3 border-t border-dark-700 text-xs text-gray-400">
+              <div>
+                Showing <span className="text-gray-200">{(historyPage - 1) * historyLimit + 1}</span>
+                –
+                <span className="text-gray-200">{Math.min(historyPage * historyLimit, historyTotal)}</span>
+                {' '}of <span className="text-gray-200">{historyTotal}</span>
+              </div>
+              <div className="flex gap-1">
+                <button
+                  onClick={() => setHistoryPage((p) => Math.max(1, p - 1))}
+                  disabled={historyPage === 1}
+                  className="px-3 py-1 rounded bg-dark-700 hover:bg-dark-600 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  ← Prev
+                </button>
+                <span className="px-3 py-1">Page {historyPage} / {totalHistoryPages}</span>
+                <button
+                  onClick={() => setHistoryPage((p) => Math.min(totalHistoryPages, p + 1))}
+                  disabled={historyPage >= totalHistoryPages}
+                  className="px-3 py-1 rounded bg-dark-700 hover:bg-dark-600 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Next →
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Recent per-creator syncs feed */}
+      <div>
+        <h3 className="text-sm font-semibold text-gray-300 mb-2">Recent Creator Profile Updates</h3>
+        <div className="bg-dark-800 border border-dark-700 rounded-lg overflow-hidden">
+          {(statusData?.recent_syncs || []).length === 0 ? (
+            <div className="px-4 py-8 text-center text-gray-500 text-sm">No sync activity yet</div>
+          ) : (
+            <ul className="divide-y divide-dark-700">
+              {(statusData?.recent_syncs || []).map((row) => {
+                const meta = PLATFORM_META[row.platform as Platform];
+                return (
+                  <li key={row._id} className="px-4 py-2.5 flex items-center gap-3 text-sm hover:bg-dark-700/40 transition-colors">
+                    <span className={`w-2 h-2 rounded-full ${meta?.dot || 'bg-gray-500'}`} />
+                    {row.creator_profile ? (
+                      <button
+                        onClick={() => navigate(`/influencers/${row.creator_profile!._id}`)}
+                        className="text-left hover:text-primary transition-colors flex-1"
+                      >
+                        <span className="font-medium text-gray-100">@{row.creator_profile.username}</span>
+                        <span className="text-xs text-gray-500 ml-2">{row.creator_profile.name}</span>
+                      </button>
+                    ) : (
+                      <span className="text-gray-500 flex-1">(creator deleted)</span>
+                    )}
+                    <span className="text-xs text-gray-400">{meta?.label || row.platform}</span>
+                    <span className="text-xs text-gray-500">{fmtTimeAgo(row.lastSyncedAt)}</span>
+                    {row.lastSyncStatus !== 'ok' && (
+                      <span className="text-xs text-amber-400">{row.lastSyncStatus}</span>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      </div>
+    </>
+  );
+};
+
+// ── Helpers for auto-resync panel ────────────────────────────────────────────
+
+function runStatusBorder(status?: SyncRun['status']): string {
+  switch (status) {
+    case 'completed': return 'bg-green-500/10 border-green-500/30 text-green-300';
+    case 'partial':   return 'bg-amber-500/10 border-amber-500/30 text-amber-300';
+    case 'failed':    return 'bg-red-500/10 border-red-500/30 text-red-300';
+    case 'running':   return 'bg-blue-500/10 border-blue-500/30 text-blue-300';
+    default:          return 'bg-dark-800 border-dark-700 text-gray-300';
+  }
+}
+
+function runStatusBadge(status: SyncRun['status']) {
+  const map: Record<SyncRun['status'], { bg: string; text: string; label: string }> = {
+    queued:    { bg: 'bg-gray-500/15',  text: 'text-gray-400',   label: 'Queued' },
+    running:   { bg: 'bg-blue-500/15',  text: 'text-blue-300',   label: 'Running' },
+    completed: { bg: 'bg-green-500/15', text: 'text-green-400',  label: 'Completed' },
+    partial:   { bg: 'bg-amber-500/15', text: 'text-amber-400',  label: 'Partial' },
+    failed:    { bg: 'bg-red-500/15',   text: 'text-red-400',    label: 'Failed' },
+  };
+  const m = map[status] || map.queued;
+  return (
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold ${m.bg} ${m.text}`}>
+      {m.label}
+    </span>
+  );
+}
+
+function summarizeRunCounters(run: SyncRun): string {
+  const totals = ['instagram', 'youtube', 'tiktok'].reduce(
+    (acc, p) => {
+      const c = (run as any)[p] as PlatformCounter | undefined;
+      if (c) {
+        acc.processed += c.processed || 0;
+        acc.succeeded += c.succeeded || 0;
+        acc.failed    += c.failed || 0;
+      }
+      return acc;
+    },
+    { processed: 0, succeeded: 0, failed: 0 }
+  );
+  return `${totals.succeeded} succeeded, ${totals.failed} failed (of ${totals.processed})`;
+}
+
+function fmtDuration(ms: number | null): string {
+  if (!ms) return '—';
+  const sec = Math.floor(ms / 1000);
+  if (sec < 60) return `${sec}s`;
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min}m ${sec % 60}s`;
+  const hr = Math.floor(min / 60);
+  return `${hr}h ${min % 60}m`;
+}
+
+const PlatformProgressBlock: React.FC<{ label: string; counter?: PlatformCounter; dot: string }> = ({ label, counter, dot }) => {
+  const eligible = counter?.eligible || 0;
+  const processed = counter?.processed || 0;
+  const pct = eligible ? Math.min(100, Math.round((processed / eligible) * 100)) : 0;
+  return (
+    <div className="px-3 py-2 rounded bg-dark-800 border border-dark-700">
+      <div className="flex items-center gap-2 mb-1.5">
+        <span className={`w-2 h-2 rounded-full ${dot}`} />
+        <span className="font-medium text-gray-200">{label}</span>
+        <span className="text-gray-500 ml-auto">{processed} / {eligible}</span>
+      </div>
+      <div className="w-full bg-dark-700 rounded-full h-1.5 overflow-hidden">
+        <div className="bg-primary h-1.5 transition-all duration-500" style={{ width: `${pct}%` }} />
+      </div>
+      <div className="flex gap-3 text-xs mt-1.5 text-gray-500">
+        <span className="text-green-400">✓ {counter?.succeeded || 0}</span>
+        {(counter?.failed || 0) > 0 && <span className="text-red-400">✕ {counter?.failed || 0}</span>}
+        {(counter?.skipped || 0) > 0 && <span className="text-amber-400">⊘ {counter?.skipped || 0}</span>}
+      </div>
+    </div>
+  );
+};
+
+// Expanded run-detail row — shows per-platform breakdown + error samples
+const RunDetailExpanded: React.FC<{ run: SyncRun; navigate: (path: string) => void }> = ({ run, navigate }) => {
+  return (
+    <div className="text-xs space-y-3 py-1">
+      <div className="grid grid-cols-3 gap-3">
+        <PlatformProgressBlock label="Instagram" counter={run.instagram} dot="bg-fuchsia-500" />
+        <PlatformProgressBlock label="YouTube"   counter={run.youtube}   dot="bg-red-500" />
+        <PlatformProgressBlock label="TikTok"    counter={run.tiktok}    dot="bg-pink-500" />
+      </div>
+      {run.notes && (
+        <div className="text-gray-400 italic">Notes: {run.notes}</div>
+      )}
+      {run.errors && run.errors.length > 0 && (
+        <div>
+          <div className="text-gray-400 mb-1.5">Errors (last {run.errors.length}):</div>
+          <ul className="space-y-1 max-h-40 overflow-y-auto">
+            {run.errors.slice(-15).reverse().map((e, idx) => (
+              <li key={idx} className="text-gray-500">
+                <button
+                  onClick={() => e.creator_id && navigate(`/influencers/${e.creator_id}`)}
+                  className="text-primary hover:underline"
+                >
+                  @{e.username}
+                </button>
+                <span className="text-gray-600"> · {e.platform} · </span>
+                <span className="text-red-400/80">{e.message}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
   );
 };
 

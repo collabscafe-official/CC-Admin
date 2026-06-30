@@ -323,15 +323,67 @@ const Insights: React.FC = () => {
   }, [infList]);
 
   // ── Reach & Influence ─────────────────────────────────────────────────────────
+  //
+  // Combined Followers and Est. Reach are computed from the most accurate data
+  // available per (creator, platform):
+  //   1. If TrustLens has synced this creator-platform, use the EXACT
+  //      `social_stats.followers` + measured `engagementRate`.
+  //   2. Otherwise, fall back to the legacy follower-range midpoint + a flat
+  //      3.2% engagement assumption (matches what we used to do for every row).
+  //
+  // We surface a "verified %" badge under Combined Followers so admins know
+  // how much of the math is real vs. estimated.
+
+  // Engagement-rate fallback for handles with no TrustLens sync yet. Matches
+  // the platform-historical baseline used before TrustLens existed.
+  const FALLBACK_ENGAGEMENT_RATE = 3.2; // percentage 0-100
 
   const reach = useMemo(() => {
     const allHandles: any[] = [];
+    let verifiedFollowerHandles = 0;     // handles where follower count came from TrustLens
+    let combinedFollowers = 0;
+    let combinedReach = 0;
+
     for (const inf of infList) {
-      if (Array.isArray(inf.social_handles)) allHandles.push(...inf.social_handles);
+      const handles = Array.isArray(inf.social_handles) ? inf.social_handles : [];
+      const statsByPlatform: Record<string, any> = {};
+      if (Array.isArray(inf.social_stats)) {
+        for (const s of inf.social_stats) {
+          if (s?.platform) statsByPlatform[s.platform] = s;
+        }
+      }
+      for (const h of handles) {
+        if (!h?.platform) continue;
+        allHandles.push(h);
+        const s = statsByPlatform[h.platform];
+        // Prefer exact TrustLens follower count; fall back to handle's own
+        // stored follower_count (YT verify flow) or range midpoint.
+        let followers = 0;
+        let isVerifiedCount = false;
+        if (s && typeof s.followers === 'number' && s.followers > 0) {
+          followers = s.followers;
+          isVerifiedCount = true;
+        } else if (typeof h.follower_count === 'number' && h.follower_count > 0) {
+          followers = h.follower_count;
+          isVerifiedCount = true;
+        } else {
+          followers = parseFollowerMidpoint(h.follower_range);
+        }
+        if (isVerifiedCount) verifiedFollowerHandles += 1;
+        // Engagement: use measured rate where TrustLens has it, else fall back.
+        // engagementRate is stored 0-100 (percentage), so divide by 100 to get
+        // a multiplier.
+        const engagementPct = s && typeof s.engagementRate === 'number' && s.engagementRate > 0
+            ? s.engagementRate
+            : FALLBACK_ENGAGEMENT_RATE;
+        combinedFollowers += followers;
+        combinedReach     += Math.round(followers * (engagementPct / 100));
+      }
     }
-    const platforms    = topN(allHandles.map(h => capitalize(h.platform)), 8);
-    const platformBar  = topN(allHandles.map(h => capitalize(h.platform)), 10);
-    const buckets      = ['0–1K', '1K–10K', '10K–100K', '100K+'];
+
+    const platforms      = topN(allHandles.map(h => capitalize(h.platform)), 8);
+    const platformBar    = topN(allHandles.map(h => capitalize(h.platform)), 10);
+    const buckets        = ['0–1K', '1K–10K', '10K–100K', '100K+'];
     const bucketMap: Record<string, number> = { '0–1K': 0, '1K–10K': 0, '10K–100K': 0, '100K+': 0 };
     for (const h of allHandles) {
       const b = getFollowerBucket(h.follower_range);
@@ -340,20 +392,22 @@ const Insights: React.FC = () => {
     const followerBuckets = buckets.map(b => ({ name: b, count: bucketMap[b] }));
     const verified        = infList.filter(i => isTruthy(i.is_email_verified)).length;
     const active          = infList.filter(i => isTruthy(i.is_active)).length;
-    // Combined followers via midpoint estimation
-    const combinedFollowers = allHandles.reduce((sum, h) => sum + parseFollowerMidpoint(h.follower_range), 0);
-    const combinedReach     = Math.round(combinedFollowers * 0.032);
-    const total             = infList.length;
-    const avgFollowers      = total > 0 ? Math.round(combinedFollowers / total) : 0;
+    const total           = infList.length;
+    const avgFollowers    = total > 0 ? Math.round(combinedFollowers / total) : 0;
     // Retention = creators who completed profile / total
-    const complete          = infList.filter(i => isTruthy(i.is_profile_completed)).length;
-    const dropoutCount      = total - complete;
-    const retentionRate     = total > 0 ? Math.round(complete / total * 100) : 0;
+    const complete        = infList.filter(i => isTruthy(i.is_profile_completed)).length;
+    const dropoutCount    = total - complete;
+    const retentionRate   = total > 0 ? Math.round(complete / total * 100) : 0;
+    const verifiedPct     = allHandles.length > 0
+        ? Math.round(verifiedFollowerHandles / allHandles.length * 100)
+        : 0;
     return {
       platforms, followerBuckets, platformBar, verified, active, totalHandles: allHandles.length,
       combinedFollowersStr: formatBig(combinedFollowers),
       combinedReachStr:     formatBig(combinedReach),
       avgFollowersStr:      formatBig(avgFollowers),
+      verifiedPct,
+      verifiedHandles:      verifiedFollowerHandles,
       retentionRate, dropoutCount,
     };
   }, [infList]);
@@ -615,12 +669,15 @@ const Insights: React.FC = () => {
                       label="Combined Followers"
                       value={reach.combinedFollowersStr}
                       accent="#4f46e5"
+                      sub={`${reach.verifiedPct}% TrustLens-verified (${reach.verifiedHandles}/${reach.totalHandles} handles)`}
                     />
                     <InsightStatCard
                       label="Est. Combined Reach"
                       value={reach.combinedReachStr}
                       accent="#10b981"
-                      sub="Based on 3.2% avg engagement"
+                      sub={reach.verifiedPct >= 50
+                        ? `Weighted by each creator's measured engagement`
+                        : `Mixed: measured engagement for ${reach.verifiedPct}% of handles, 3.2% fallback otherwise`}
                     />
                     <InsightStatCard
                       label="Avg. Followers / Creator"

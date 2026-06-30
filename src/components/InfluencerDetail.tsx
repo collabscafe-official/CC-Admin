@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useLocation, useParams, useNavigate } from 'react-router-dom';
-import { approveCreator, getCreators } from '../store/actions/creatorAction';
+import { approveCreator, declineCreator, getCreators } from '../store/actions/creatorAction';
 import PackagesSection from './PackagesSection';
 import ContentHighlights from './ContentHighlights';
 import FaqsSection from './FaqsSection';
 import TrustLensAdminPanel from './TrustLensAdminPanel';
+import DeclineCreatorModal from './DeclineCreatorModal';
 
 const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
   const baseClasses = "px-2 py-1 text-xs font-medium rounded-full inline-block";
@@ -112,6 +113,8 @@ const InfluencerDetail: React.FC = () => {
   const location = useLocation() as any;
   const creators = useSelector((state: any) => state.creators);
   const [isApproving, setIsApproving] = useState(false);
+  const [showDeclineModal, setShowDeclineModal] = useState(false);
+  const [isDeclining, setIsDeclining] = useState(false);
 
   const influencer = location.state?.influencer || creators?.profiles?.find((p: any) => p._id === id);
   const savedPage = location.state?.currentPage || 1;
@@ -122,6 +125,19 @@ const InfluencerDetail: React.FC = () => {
     dispatch(approveCreator(id, (success: boolean) => {
       setIsApproving(false);
       if (success) {
+        dispatch(getCreators(savedItemsPerPage, savedPage) as unknown as any);
+        navigate('/influencers', { state: { currentPage: savedPage, itemsPerPage: savedItemsPerPage } });
+      }
+    }) as unknown as any);
+  };
+
+  const handleDeclineConfirm = (reasons: string[], customNote: string) => {
+    if (!influencer?._id) return;
+    setIsDeclining(true);
+    dispatch(declineCreator(influencer._id, reasons, customNote, (success: boolean) => {
+      setIsDeclining(false);
+      if (success) {
+        setShowDeclineModal(false);
         dispatch(getCreators(savedItemsPerPage, savedPage) as unknown as any);
         navigate('/influencers', { state: { currentPage: savedPage, itemsPerPage: savedItemsPerPage } });
       }
@@ -150,23 +166,32 @@ const InfluencerDetail: React.FC = () => {
         </h2>
         <div className="flex items-center space-x-4">
             {!influencer.is_approved_by_admin && (
-                <button
-                    onClick={() => handleApproveCreator(influencer._id)}
-                    disabled={isApproving}
-                    className="inline-flex items-center px-4 py-2 text-sm font-medium text-white transition-opacity duration-150 bg-green-600 rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 dark:focus:ring-offset-dark-800 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                   {isApproving ? (
-                     <>
-                       <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                       </svg>
-                       Approving...
-                     </>
-                   ) : (
-                     'Approve Profile'
-                   )}
-                </button>
+                <>
+                    <button
+                        onClick={() => setShowDeclineModal(true)}
+                        disabled={isApproving || isDeclining}
+                        className="inline-flex items-center px-4 py-2 text-sm font-medium text-white transition-opacity duration-150 bg-red-600 rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 dark:focus:ring-offset-dark-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        Decline
+                    </button>
+                    <button
+                        onClick={() => handleApproveCreator(influencer._id)}
+                        disabled={isApproving || isDeclining}
+                        className="inline-flex items-center px-4 py-2 text-sm font-medium text-white transition-opacity duration-150 bg-green-600 rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 dark:focus:ring-offset-dark-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                       {isApproving ? (
+                         <>
+                           <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                           </svg>
+                           Approving...
+                         </>
+                       ) : (
+                         'Approve Profile'
+                       )}
+                    </button>
+                </>
             )}
             <button
                 onClick={handleBack}
@@ -394,6 +419,15 @@ const InfluencerDetail: React.FC = () => {
         </div>
       )}
       </div>
+
+      {showDeclineModal && (
+        <DeclineCreatorModal
+          influencerName={influencer.name || influencer.username || 'this creator'}
+          onConfirm={handleDeclineConfirm}
+          onCancel={() => setShowDeclineModal(false)}
+          isSubmitting={isDeclining}
+        />
+      )}
     </>
   );
 };

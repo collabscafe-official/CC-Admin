@@ -93,6 +93,46 @@ function capitalize(str: string): string {
   return str.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
 }
 
+// Approval label resolver. Reads `approval_status` if present, otherwise
+// falls back to the legacy `is_approved_by_admin` boolean. New code should
+// always set both, but historical / migrated docs may have only the boolean.
+function approvalLabel(inf: any): 'Approved' | 'Declined' | 'Re-review' | 'Not Approved' {
+  const s = inf?.approval_status;
+  if (s === 'approved') return 'Approved';
+  if (s === 'declined') return 'Declined';
+  if (s === 'pending_re_review') return 'Re-review';
+  if (inf?.is_approved_by_admin) return 'Approved';
+  return 'Not Approved';
+}
+
+// "Previously declined N×" indicator. Renders only when the creator has at
+// least one prior decline AND they're currently in any status other than
+// 'declined' (where the main badge already says Declined). Useful trust signal
+// for repeat-rejected creators.
+function DeclineHistoryBadge({ inf }: { inf: any }) {
+  const history = Array.isArray(inf?.decline_history) ? inf.decline_history : [];
+  if (history.length === 0) return null;
+  if (inf?.approval_status === 'declined') return null;
+  return (
+    <span
+      style={{
+        display: 'inline-block',
+        padding: '2px 8px',
+        borderRadius: 999,
+        fontSize: 11,
+        fontWeight: 600,
+        background: 'rgba(245,158,11,0.12)',
+        color: '#fbbf24',
+        border: '1px solid rgba(245,158,11,0.25)',
+        whiteSpace: 'nowrap',
+      }}
+      title={`This creator was previously declined ${history.length} time(s)`}
+    >
+      Declined {history.length}×
+    </span>
+  );
+}
+
 // Renders a "TrustLens: 3d ago" pill that tints by staleness. The auto-resync
 // scheduler runs every 14 days; we color amber after 20 days (cycle missed)
 // and red after 35 days (two cycles missed — actual problem).
@@ -211,7 +251,10 @@ const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
       bg = 'rgba(239,68,68,0.15)'; color = '#ef4444'; break;
     case 'Pending':
     case 'Not Approved':
+    case 'Re-review':
       bg = 'rgba(245,158,11,0.15)'; color = '#f59e0b'; break;
+    case 'Declined':
+      bg = 'rgba(239,68,68,0.15)'; color = '#ef4444'; break;
     case 'Inactive':
       bg = 'rgba(156,163,175,0.12)'; color = '#9ca3af'; break;
     default:
@@ -696,11 +739,13 @@ const Influencers: React.FC = () => {
               </div>
 
               <div>
-                <label style={labelStyle}>Admin Approved</label>
+                <label style={labelStyle}>Approval Status</label>
                 <select className="inf-select" value={filters.is_approved_by_admin} onChange={e => handleFilterChange('is_approved_by_admin', e.target.value)} style={fieldStyle}>
                   <option value="">All</option>
-                  <option value="1">Yes</option>
-                  <option value="0">No</option>
+                  <option value="1">Approved</option>
+                  <option value="0">Not approved (pending)</option>
+                  <option value="declined">Declined</option>
+                  <option value="pending_re_review">Re-review</option>
                 </select>
               </div>
 
@@ -812,7 +857,8 @@ const Influencers: React.FC = () => {
                         {/* Approval + TrustLens freshness */}
                         <td style={{ padding: '12px 16px' }}>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
-                            <StatusBadge status={inf.is_approved_by_admin ? 'Approved' : 'Not Approved'} />
+                            <StatusBadge status={approvalLabel(inf)} />
+                            <DeclineHistoryBadge inf={inf} />
                             <TrustLensFreshness inf={inf} />
                           </div>
                         </td>
@@ -872,7 +918,10 @@ const Influencers: React.FC = () => {
                           <div style={{ fontWeight: 700, color: '#f9fafb', fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{inf.name}</div>
                           <div style={{ fontSize: 11, color: '#6b7280', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{inf.email}</div>
                         </div>
-                        <StatusBadge status={inf.is_approved_by_admin ? 'Approved' : 'Not Approved'} />
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-end' }}>
+                          <StatusBadge status={approvalLabel(inf)} />
+                          <DeclineHistoryBadge inf={inf} />
+                        </div>
                       </div>
 
                       {/* Meta */}

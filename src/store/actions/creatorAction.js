@@ -58,6 +58,29 @@ export const approveCreator = (id, callback) => {
     }
 }
 
+// Decline a creator with selected reason codes + optional custom note.
+// Mirrors approveCreator's shape so InfluencerDetail can swap them.
+export const declineCreator = (id, reasons, customNote, callback) => {
+    return async (dispatch) => {
+        try {
+            const response = await collabs.put(`/admin/influencers/decline`, {
+                _id: id,
+                reasons,
+                custom_note: customNote || '',
+            });
+            if (response.data.success) {
+                toast.success(response.data.message || 'Creator declined and notified.');
+                callback(true);
+            } else {
+                callback(false);
+            }
+        } catch (error) {
+            toast.error(error?.response?.data?.message || 'Failed to decline creator');
+            callback(false);
+        }
+    }
+}
+
 export const deleteCreator = (id, callback) => {
     return async (dispatch) => {
         try {

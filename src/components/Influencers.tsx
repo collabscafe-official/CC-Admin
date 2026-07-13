@@ -80,6 +80,24 @@ function formatJoinDate(dateStr: string): string {
   }
 }
 
+// Legacy creators are missing the manual `created_date` field. Prefer it
+// when present (kept for parity with older admin queries), otherwise fall
+// back to Mongoose's auto-timestamps `created_at`, and finally derive from
+// the ObjectId itself (the first 4 bytes are the insertion Unix timestamp,
+// which every Mongo doc has for free).
+function pickJoinDate(inf: any): string {
+  if (inf?.created_date) return inf.created_date;
+  if (inf?.created_at)   return inf.created_at;
+  const id = inf?._id ? String(inf._id) : '';
+  if (id.length >= 8) {
+    const seconds = parseInt(id.substring(0, 8), 16);
+    if (!Number.isNaN(seconds) && seconds > 0) {
+      return new Date(seconds * 1000).toISOString();
+    }
+  }
+  return '';
+}
+
 function getInitials(name: string): string {
   if (!name) return '?';
   const parts = name.trim().split(' ');
@@ -864,7 +882,7 @@ const Influencers: React.FC = () => {
                         </td>
                         {/* Joined */}
                         <td style={{ padding: '12px 16px', color: '#9ca3af', whiteSpace: 'nowrap', fontSize: 12 }}>
-                          {formatJoinDate(inf.created_date)}
+                          {formatJoinDate(pickJoinDate(inf))}
                         </td>
                         {/* Action */}
                         <td style={{ padding: '12px 16px' }}>
@@ -929,7 +947,7 @@ const Influencers: React.FC = () => {
                         {[capitalize(inf.city), capitalize(inf.country)].filter(Boolean).join(', ') || 'Location unknown'}
                       </div>
                       <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 12 }}>
-                        Joined {formatJoinDate(inf.created_date)}
+                        Joined {formatJoinDate(pickJoinDate(inf))}
                       </div>
 
                       {/* Status chips */}

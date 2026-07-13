@@ -391,7 +391,25 @@ const InfluencerDetail: React.FC = () => {
               </div>
               <div>
                 <p className="font-semibold text-gray-700 dark:text-gray-300">Join Date</p>
-                <p>{influencer?.created_date.split('T')[0]} {influencer?.created_date.split('T')[1].split(':').slice(0, 2).join(':')}</p>
+                {(() => {
+                  // Some legacy creators pre-date the manual `created_date`
+                  // field. Fall back through: created_date → created_at (auto
+                  // timestamps) → the ObjectId's embedded timestamp (always
+                  // present since Mongo generates it). Without the guard the
+                  // page crashed with "Cannot read properties of undefined
+                  // (reading 'split')" and rendered blank for those creators.
+                  const stamp =
+                    influencer?.created_date ||
+                    influencer?.created_at ||
+                    (influencer?._id
+                      ? new Date(parseInt(String(influencer._id).substring(0, 8), 16) * 1000).toISOString()
+                      : null);
+                  if (!stamp) return <p>—</p>;
+                  const iso = String(stamp);
+                  const [date, timePart] = iso.split('T');
+                  const time = timePart ? timePart.split(':').slice(0, 2).join(':') : '';
+                  return <p>{date}{time ? ` ${time}` : ''}</p>;
+                })()}
               </div>
             </div>
           </div>

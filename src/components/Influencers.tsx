@@ -98,6 +98,107 @@ function pickJoinDate(inf: any): string {
   return '';
 }
 
+// Card helper: pick the platform stat with the highest follower count.
+// Admin card shows "24.5K on TikTok" style — a single honest number rather
+// than a summed total across platforms (which would double-count same
+// person following someone on both IG and TikTok). Returns null if no
+// social_stats entries or no valid follower counts.
+function pickBestFollowerStat(inf: any): { platform: string; followers: number; handle?: string } | null {
+  const stats = Array.isArray(inf?.social_stats) ? inf.social_stats : [];
+  let best: any = null;
+  for (const s of stats) {
+    const n = Number(s?.followers) || 0;
+    if (n > 0 && (best === null || n > best.followers)) {
+      best = { platform: s.platform || '', followers: n, handle: s.handle || '' };
+    }
+  }
+  return best;
+}
+
+// Card helper: highest TrustLens score across their verified platforms.
+// Same reasoning as follower count — show their strongest platform rather
+// than an averaged number that hides the outlier. Includes tier label for
+// context so a 47 doesn't just read as "medium".
+function pickBestTrustLens(inf: any): { score: number; tier: string; platform: string } | null {
+  const stats = Array.isArray(inf?.social_stats) ? inf.social_stats : [];
+  let best: any = null;
+  for (const s of stats) {
+    const score = Number(s?.trustLensScore) || 0;
+    if (score > 0 && (best === null || score > best.score)) {
+      best = { score, tier: s.trustLensScoreTier || '', platform: s.platform || '' };
+    }
+  }
+  return best;
+}
+
+// Card helper: which platforms has the creator connected? Uses
+// social_handles (self-reported connections) rather than social_stats
+// (measured), so a just-verified creator with pending analytics still
+// shows their linked platforms. Deduped, filtered to non-empty values.
+function pickConnectedPlatforms(inf: any): string[] {
+  const handles = Array.isArray(inf?.social_handles) ? inf.social_handles : [];
+  const set = new Set<string>();
+  for (const h of handles) {
+    const p = (h?.platform || '').toLowerCase().trim();
+    if (p) set.add(p);
+  }
+  return Array.from(set);
+}
+
+// Compact follower count: 987 → "987", 12500 → "12.5K", 1234567 → "1.2M".
+function formatFollowerCount(n: number): string {
+  if (!n || n <= 0) return '0';
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(n >= 10_000_000 ? 0 : 1)}M`;
+  if (n >= 1_000)     return `${(n / 1_000).toFixed(n >= 10_000 ? 0 : 1)}K`;
+  return String(n);
+}
+
+// TrustLens tier → theme color for the score chip. Falls back to neutral
+// grey if the tier string doesn't match the known set from the SocialStats
+// model (should never happen if backend is current, but harmless).
+function trustLensTierColor(tier: string): { bg: string; fg: string; border: string } {
+  const t = (tier || '').toLowerCase();
+  if (t.includes('highly'))  return { bg: 'rgba(34,197,94,0.15)',  fg: '#86efac', border: 'rgba(34,197,94,0.3)' };
+  if (t.includes('mostly'))  return { bg: 'rgba(59,130,246,0.15)', fg: '#93c5fd', border: 'rgba(59,130,246,0.3)' };
+  if (t.includes('average')) return { bg: 'rgba(245,158,11,0.15)', fg: '#fcd34d', border: 'rgba(245,158,11,0.3)' };
+  if (t.includes('high risk') || t.includes('risk'))
+    return { bg: 'rgba(239,68,68,0.15)', fg: '#fca5a5', border: 'rgba(239,68,68,0.3)' };
+  return { bg: 'rgba(107,114,128,0.15)', fg: '#d1d5db', border: 'rgba(107,114,128,0.3)' };
+}
+
+// Compact platform label for the "on TikTok" suffix + icon tooltips.
+function platformLabel(p: string): string {
+  const key = (p || '').toLowerCase();
+  if (key === 'instagram') return 'Instagram';
+  if (key === 'tiktok')    return 'TikTok';
+  if (key === 'youtube')   return 'YouTube';
+  if (key === 'twitter')   return 'Twitter';
+  if (key === 'facebook')  return 'Facebook';
+  if (key === 'linkedin')  return 'LinkedIn';
+  return key.charAt(0).toUpperCase() + key.slice(1);
+}
+
+// Small inline SVG per platform. Monochrome (currentColor) so the parent
+// controls the tint — keeps the admin dark theme cohesive. New platforms
+// fall back to a generic globe glyph.
+function PlatformIcon({ platform, size = 14 }: { platform: string; size?: number }) {
+  const key = (platform || '').toLowerCase();
+  const paths: Record<string, React.ReactElement> = {
+    instagram: <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z" />,
+    tiktok:    <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z" />,
+    youtube:   <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />,
+    twitter:   <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />,
+    facebook:  <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />,
+    linkedin:  <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />,
+  };
+  const path = paths[key] || <circle cx="12" cy="12" r="9" />;
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} fill="currentColor" aria-hidden>
+      {path}
+    </svg>
+  );
+}
+
 function getInitials(name: string): string {
   if (!name) return '?';
   const parts = name.trim().split(' ');
@@ -915,16 +1016,21 @@ const Influencers: React.FC = () => {
                 <EmptyState hasFilters={activeFilterCount > 0 || !!searchQuery} onClear={clearFilters} />
               ) : (
                 <div className="inf-card-grid">
-                  {filteredInfluencers.map((inf: any) => (
+                  {filteredInfluencers.map((inf: any) => {
+                    const bestFollower = pickBestFollowerStat(inf);
+                    const bestTrust    = pickBestTrustLens(inf);
+                    const connected    = pickConnectedPlatforms(inf);
+                    const trustColors  = bestTrust ? trustLensTierColor(bestTrust.tier) : null;
+                    return (
                     <div
                       key={inf._id}
                       onClick={() => handleViewProfile(inf)}
-                      style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.07)', padding: 20, cursor: 'pointer', transition: 'border-color 0.15s ease, background 0.15s ease' }}
+                      style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.07)', padding: 16, cursor: 'pointer', transition: 'border-color 0.15s ease, background 0.15s ease', display: 'flex', flexDirection: 'column', gap: 12 }}
                       onMouseEnter={e => { const d = e.currentTarget as HTMLDivElement; d.style.borderColor = 'rgba(79,70,229,0.4)'; d.style.background = 'rgba(79,70,229,0.05)'; }}
                       onMouseLeave={e => { const d = e.currentTarget as HTMLDivElement; d.style.borderColor = 'rgba(255,255,255,0.07)'; d.style.background = 'rgba(255,255,255,0.03)'; }}
                     >
-                      {/* Header */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+                      {/* Header: avatar + name/username + approval */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                         {inf.profile_image ? (
                           <img src={inf.profile_image} alt={inf.name} style={{ width: 44, height: 44, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
                         ) : (
@@ -933,8 +1039,10 @@ const Influencers: React.FC = () => {
                           </div>
                         )}
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontWeight: 700, color: '#f9fafb', fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{inf.name}</div>
-                          <div style={{ fontSize: 11, color: '#6b7280', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{inf.email}</div>
+                          <div style={{ fontWeight: 700, color: '#f9fafb', fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{inf.name || '—'}</div>
+                          <div style={{ fontSize: 11.5, color: '#818cf8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {inf.username ? `@${inf.username}` : (inf.email || '')}
+                          </div>
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-end' }}>
                           <StatusBadge status={approvalLabel(inf)} />
@@ -942,12 +1050,87 @@ const Influencers: React.FC = () => {
                         </div>
                       </div>
 
-                      {/* Meta */}
-                      <div style={{ fontSize: 12, color: '#9ca3af', marginBottom: 4 }}>
-                        {[capitalize(inf.city), capitalize(inf.country)].filter(Boolean).join(', ') || 'Location unknown'}
-                      </div>
-                      <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 12 }}>
-                        Joined {formatJoinDate(pickJoinDate(inf))}
+                      {/* TrustLens + Followers row — the two numbers admins care about most */}
+                      {(bestTrust || bestFollower) && (
+                        <div style={{ display: 'flex', gap: 12, alignItems: 'stretch' }}>
+                          {bestTrust && (
+                            <div
+                              style={{
+                                flex: 1,
+                                padding: '10px 12px',
+                                borderRadius: 10,
+                                background: trustColors!.bg,
+                                border: `1px solid ${trustColors!.border}`,
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: 2,
+                                minWidth: 0,
+                              }}
+                              title={`TrustLens · ${bestTrust.tier || 'no tier'} · ${platformLabel(bestTrust.platform)}`}
+                            >
+                              <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: trustColors!.fg, opacity: 0.85 }}>TrustLens</div>
+                              <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                                <span style={{ fontSize: 20, fontWeight: 800, color: trustColors!.fg, lineHeight: 1 }}>{bestTrust.score}</span>
+                                <span style={{ fontSize: 10.5, color: trustColors!.fg, opacity: 0.8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{bestTrust.tier || '—'}</span>
+                              </div>
+                            </div>
+                          )}
+                          {bestFollower && (
+                            <div
+                              style={{
+                                flex: 1,
+                                padding: '10px 12px',
+                                borderRadius: 10,
+                                background: 'rgba(255,255,255,0.03)',
+                                border: '1px solid rgba(255,255,255,0.08)',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: 2,
+                                minWidth: 0,
+                              }}
+                              title={`${bestFollower.followers.toLocaleString()} followers on ${platformLabel(bestFollower.platform)}${bestFollower.handle ? ` · ${bestFollower.handle}` : ''}`}
+                            >
+                              <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#9ca3af' }}>Followers</div>
+                              <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                                <span style={{ fontSize: 20, fontWeight: 800, color: '#f3f4f6', lineHeight: 1 }}>{formatFollowerCount(bestFollower.followers)}</span>
+                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, color: '#9ca3af', fontSize: 10.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>
+                                  <PlatformIcon platform={bestFollower.platform} size={11} />
+                                  {platformLabel(bestFollower.platform)}
+                                </span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Connected platform icons — small monochrome row so at-a-glance you see what they've linked. */}
+                      {connected.length > 0 && (
+                        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                          <span style={{ fontSize: 10, color: '#6b7280', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Connected</span>
+                          {connected.map(p => (
+                            <span
+                              key={p}
+                              title={platformLabel(p)}
+                              style={{
+                                width: 22, height: 22, borderRadius: 6,
+                                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                                background: 'rgba(255,255,255,0.05)',
+                                border: '1px solid rgba(255,255,255,0.08)',
+                                color: '#9ca3af',
+                              }}
+                            >
+                              <PlatformIcon platform={p} size={12} />
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Footer meta */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, fontSize: 11, color: '#6b7280', paddingTop: 4, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>
+                          {[capitalize(inf.city), capitalize(inf.country)].filter(Boolean).join(', ') || 'Location unknown'}
+                        </span>
+                        <span>Joined {formatJoinDate(pickJoinDate(inf))}</span>
                       </div>
 
                       {/* Status chips */}
@@ -956,9 +1139,9 @@ const Influencers: React.FC = () => {
                         {!inf.is_active && <StatusBadge status="Inactive" />}
                         <TrustLensFreshness inf={inf} />
                       </div>
-
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>

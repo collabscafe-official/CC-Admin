@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useLocation, useParams, useNavigate } from 'react-router-dom';
-import { approveCreator, declineCreator, getCreators } from '../store/actions/creatorAction';
+import { approveCreator, declineCreator } from '../store/actions/creatorAction';
 import PackagesSection from './PackagesSection';
 import ContentHighlights from './ContentHighlights';
 import FaqsSection from './FaqsSection';
@@ -125,7 +125,13 @@ const InfluencerDetail: React.FC = () => {
     dispatch(approveCreator(id, (success: boolean) => {
       setIsApproving(false);
       if (success) {
-        dispatch(getCreators(savedItemsPerPage, savedPage) as unknown as any);
+        // Don't dispatch getCreators here — it was being called with only
+        // (limit, page) and no callback, which threw TypeError inside the
+        // action's success branch and dispatched GET_CREATORS: null, wiping
+        // the list from redux. Result was the "No influencers found" screen
+        // that only came back after a full refresh. The list page's own
+        // mount-time useEffect refetches with the correct filters, so this
+        // extra call was both wrong AND unnecessary.
         navigate('/influencers', { state: { currentPage: savedPage, itemsPerPage: savedItemsPerPage } });
       }
     }) as unknown as any);
@@ -138,14 +144,16 @@ const InfluencerDetail: React.FC = () => {
       setIsDeclining(false);
       if (success) {
         setShowDeclineModal(false);
-        dispatch(getCreators(savedItemsPerPage, savedPage) as unknown as any);
+        // See handleApproveCreator — the extra getCreators dispatch was
+        // wiping redux state. Removed for the same reason.
         navigate('/influencers', { state: { currentPage: savedPage, itemsPerPage: savedItemsPerPage } });
       }
     }) as unknown as any);
   };
 
   const handleBack = () => {
-    dispatch(getCreators(savedItemsPerPage, savedPage) as unknown as any);
+    // See handleApproveCreator — the extra getCreators dispatch was wiping
+    // redux state on return. Removed for the same reason.
     navigate('/influencers', { state: { currentPage: savedPage, itemsPerPage: savedItemsPerPage } });
   };
 

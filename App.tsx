@@ -11,6 +11,7 @@ const Influencers = lazy(() => import('./src/components/Influencers'));
 const InfluencerDetail = lazy(() => import('./src/components/InfluencerDetail'));
 const Brands = lazy(() => import('./src/components/Brands'));
 const BrandDetail = lazy(() => import('./src/components/BrandDetail'));
+const CampaignsModeration = lazy(() => import('./src/components/CampaignsModeration'));
 const LoginPage = lazy(() => import('./src/components/LoginPage'));
 
 const App: React.FC = () => {
@@ -34,7 +35,9 @@ const Main: React.FC = () => {
     ? 'Influencers'
     : pathname.startsWith('/brands')
       ? 'Brands'
-      : 'Dashboard';
+      : pathname.startsWith('/campaigns')
+        ? 'Campaigns'
+        : 'Dashboard';
 
   const setActiveScreen = (screen: string) => {
     switch (screen) {
@@ -43,6 +46,9 @@ const Main: React.FC = () => {
         break;
       case 'Brands':
         navigate('/brands');
+        break;
+      case 'Campaigns':
+        navigate('/campaigns');
         break;
       case 'Dashboard':
       default:
@@ -75,6 +81,7 @@ const Main: React.FC = () => {
                     <Route path="/influencers/:id" element={<InfluencerDetail />} />
                     <Route path="/brands" element={<Brands />} />
                     <Route path="/brands/:id" element={<BrandDetail />} />
+                    <Route path="/campaigns" element={<CampaignsModeration />} />
                     <Route path="/login" element={<Navigate to="/dashboard" replace />} />
                     <Route path="/" element={<Navigate to="/dashboard" replace />} />
                     <Route path="*" element={<Navigate to="/dashboard" replace />} />

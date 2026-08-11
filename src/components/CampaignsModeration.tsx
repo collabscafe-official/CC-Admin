@@ -14,7 +14,12 @@ interface Campaign {
     title: string;
     brief: string;
     status: string;
+    rejection_reason?: string;
+    pitches_count?: number;
     submitted_at?: string;
+    approved_at?: string;
+    closed_at?: string;
+    application_deadline?: string;
     application_deadline_days?: number;
     budget: { min: number; max: number; currency?: string };
     deliverable: { platform: string; type: string; quantity: number };
@@ -28,6 +33,29 @@ interface Campaign {
         social_handles?: Array<{ platform: string; url: string }>;
     };
 }
+
+// Status tabs — per user directive 2026-08-11 admin sees ALL campaigns, not
+// just pending_review. Order matches typical review flow (pending first).
+const STATUS_TABS: Array<{ key: string; label: string; count?: boolean }> = [
+    { key: 'pending_review', label: 'Under review' },
+    { key: 'open',           label: 'Active' },
+    { key: 'in_progress',    label: 'In progress' },
+    { key: 'closed',         label: 'Closed' },
+    { key: 'rejected',       label: 'Denied' },
+    { key: 'cancelled',      label: 'Cancelled' },
+    { key: 'completed',      label: 'Completed' },
+    { key: 'all',            label: 'All' },
+];
+
+const STATUS_PILL_STYLES: Record<string, { color: string; bg: string }> = {
+    pending_review: { color: '#d97706', bg: 'rgba(217,119,6,0.15)' },
+    open:           { color: '#22c55e', bg: 'rgba(34,197,94,0.15)' },
+    in_progress:    { color: '#3b82f6', bg: 'rgba(59,130,246,0.15)' },
+    closed:         { color: '#9ca3af', bg: 'rgba(156,163,175,0.15)' },
+    rejected:       { color: '#ef4444', bg: 'rgba(239,68,68,0.15)' },
+    cancelled:      { color: '#9ca3af', bg: 'rgba(156,163,175,0.15)' },
+    completed:      { color: '#22c55e', bg: 'rgba(34,197,94,0.15)' },
+};
 
 function formatPKR(v: number | undefined) {
     if (v === null || v === undefined) return '—';
@@ -52,23 +80,31 @@ const CampaignsModeration: React.FC = () => {
     const [rejectModal, setRejectModal] = useState<{ id: string; title: string } | null>(null);
     const [rejectReason, setRejectReason] = useState('');
     const [expandedId, setExpandedId] = useState<string | null>(null);
+    const [tab, setTab] = useState<string>('pending_review');
 
     const fetchQueue = useCallback(async () => {
         setLoading(true);
         setError('');
         try {
-            const res = await collabs.post('/admin/campaigns/list-pending', {});
+            // Backend list-pending endpoint accepts an optional status filter.
+            // Passing status='all' or omitting the field returns everything;
+            // we send an explicit '' status when tab==='all' so the backend
+            // controller's default (pending_review) doesn't apply.
+            const body: any = {};
+            if (tab && tab !== 'all') body.status = tab;
+            else body.status = ''; // controller will treat empty string as no filter
+            const res = await collabs.post('/admin/campaigns/list-pending', body);
             if (res.data?.success) {
                 setCampaigns(res.data.data?.campaigns || []);
             } else {
-                setError(res.data?.message || 'Could not load moderation queue.');
+                setError(res.data?.message || 'Could not load campaigns.');
             }
         } catch (err: any) {
             setError(err?.response?.data?.message || 'Something went wrong.');
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [tab]);
 
     useEffect(() => { fetchQueue(); }, [fetchQueue]);
 
@@ -78,7 +114,10 @@ const CampaignsModeration: React.FC = () => {
         try {
             const res = await collabs.post('/admin/campaigns/approve', { id });
             if (res.data?.success) {
-                setCampaigns(prev => prev.filter(c => c._id !== id));
+                // Refetch so the campaign moves out of the current tab into
+                // its new status tab (was removed from list before, but that
+                // was misleading when viewing the 'All' tab).
+                fetchQueue();
             } else {
                 alert(res.data?.message || 'Could not approve.');
             }
@@ -100,9 +139,9 @@ const CampaignsModeration: React.FC = () => {
         try {
             const res = await collabs.post('/admin/campaigns/reject', { id: rejectModal.id, reason });
             if (res.data?.success) {
-                setCampaigns(prev => prev.filter(c => c._id !== rejectModal.id));
                 setRejectModal(null);
                 setRejectReason('');
+                fetchQueue();
             } else {
                 alert(res.data?.message || 'Could not reject.');
             }
@@ -115,11 +154,11 @@ const CampaignsModeration: React.FC = () => {
 
     return (
         <div className="text-gray-100">
-            <div className="flex justify-between items-center mb-6">
+            <div className="flex justify-between items-center mb-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-white">Campaigns moderation</h1>
+                    <h1 className="text-2xl font-bold text-white">Campaigns</h1>
                     <p className="text-sm text-gray-400">
-                        {loading ? 'Loading…' : `${campaigns.length} campaign${campaigns.length === 1 ? '' : 's'} awaiting review`}
+                        {loading ? 'Loading…' : `${campaigns.length} campaign${campaigns.length === 1 ? '' : 's'} shown`}
                     </p>
                 </div>
                 <button
@@ -131,19 +170,39 @@ const CampaignsModeration: React.FC = () => {
                 </button>
             </div>
 
+            {/* Status filter tabs */}
+            <div className="flex gap-2 flex-wrap mb-6">
+                {STATUS_TABS.map(t => (
+                    <button
+                        key={t.key}
+                        onClick={() => setTab(t.key)}
+                        className={`px-3 py-1.5 rounded-full text-xs font-medium transition ${
+                            tab === t.key
+                                ? 'bg-primary text-white'
+                                : 'bg-dark-800 text-gray-400 hover:text-white border border-dark-700'
+                        }`}
+                    >
+                        {t.label}
+                    </button>
+                ))}
+            </div>
+
             {error && (
                 <div className="bg-red-900/40 border border-red-700 text-red-200 p-4 rounded mb-4">{error}</div>
             )}
 
             {!loading && !error && campaigns.length === 0 && (
                 <div className="bg-dark-800 border border-dark-700 p-8 rounded text-center text-gray-400">
-                    The queue is empty. Nothing to review right now.
+                    No campaigns in this state.
                 </div>
             )}
 
             <div className="space-y-4">
                 {campaigns.map(c => {
                     const isExpanded = expandedId === c._id;
+                    const isActionable = c.status === 'pending_review';
+                    const pillStyle = STATUS_PILL_STYLES[c.status] || { color: '#9ca3af', bg: 'rgba(156,163,175,0.15)' };
+                    const statusLabel = STATUS_TABS.find(t => t.key === c.status)?.label || c.status;
                     return (
                         <div key={c._id} className="bg-dark-800 border border-dark-700 rounded-lg p-5">
                             <div className="flex items-start justify-between gap-4">
@@ -169,6 +228,12 @@ const CampaignsModeration: React.FC = () => {
                                                 ))}
                                             </div>
                                         </div>
+                                        <span
+                                            className="ml-auto px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider"
+                                            style={{ color: pillStyle.color, background: pillStyle.bg }}
+                                        >
+                                            {statusLabel}
+                                        </span>
                                     </div>
 
                                     {/* Campaign summary */}
@@ -181,9 +246,18 @@ const CampaignsModeration: React.FC = () => {
                                             {c.deliverable?.platform} · {c.deliverable?.type} × {c.deliverable?.quantity}
                                         </span>
                                         <span>{formatPKR(c.budget?.min)} – {formatPKR(c.budget?.max)}</span>
-                                        <span>Open {c.application_deadline_days} days after approval</span>
+                                        {typeof c.pitches_count === 'number' && (
+                                            <span>{c.pitches_count} pitch{c.pitches_count === 1 ? '' : 'es'}</span>
+                                        )}
                                         <span>Submitted {formatWhen(c.submitted_at)}</span>
                                     </div>
+
+                                    {/* Rejection reason surfaced on 'rejected' rows so admins can audit */}
+                                    {c.status === 'rejected' && c.rejection_reason && (
+                                        <div className="text-xs text-red-300 bg-red-900/20 border border-red-800/50 rounded p-2 mb-3">
+                                            <strong>Reason sent to brand:</strong> {c.rejection_reason}
+                                        </div>
+                                    )}
 
                                     {/* Brief — collapsed by default; long briefs need a click to expand */}
                                     <div className="text-sm text-gray-300 whitespace-pre-wrap">
@@ -201,22 +275,24 @@ const CampaignsModeration: React.FC = () => {
                                     )}
                                 </div>
 
-                                <div className="flex flex-col gap-2 min-w-[130px]">
-                                    <button
-                                        onClick={() => approve(c._id)}
-                                        disabled={busyId === c._id}
-                                        className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded font-medium text-sm"
-                                    >
-                                        {busyId === c._id ? 'Working…' : 'Approve'}
-                                    </button>
-                                    <button
-                                        onClick={() => { setRejectModal({ id: c._id, title: c.title }); setRejectReason(''); }}
-                                        disabled={busyId === c._id}
-                                        className="px-4 py-2 bg-red-700 hover:bg-red-800 disabled:opacity-50 text-white rounded font-medium text-sm"
-                                    >
-                                        Reject
-                                    </button>
-                                </div>
+                                {isActionable && (
+                                    <div className="flex flex-col gap-2 min-w-[130px]">
+                                        <button
+                                            onClick={() => approve(c._id)}
+                                            disabled={busyId === c._id}
+                                            className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded font-medium text-sm"
+                                        >
+                                            {busyId === c._id ? 'Working…' : 'Approve'}
+                                        </button>
+                                        <button
+                                            onClick={() => { setRejectModal({ id: c._id, title: c.title }); setRejectReason(''); }}
+                                            disabled={busyId === c._id}
+                                            className="px-4 py-2 bg-red-700 hover:bg-red-800 disabled:opacity-50 text-white rounded font-medium text-sm"
+                                        >
+                                            Reject
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     );

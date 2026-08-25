@@ -145,6 +145,19 @@ const EVENT_LABELS: Record<string, string> = {
   custom_offer_inbox_viewed: '📥 Viewed custom offers inbox',
   custom_offer_cancelled: '🗙 Cancelled custom offer',
   custom_offer_checkout_started: '💳 Started custom-offer checkout',
+  // Campaigns funnel — brand posts an open call, creators pitch, brand hires.
+  campaign_post_page_opened: '📝 Opened post-campaign',
+  campaign_ai_draft_requested: '✨ Requested AI draft',
+  campaign_ai_draft_succeeded: '🤖 AI draft returned',
+  campaign_ai_draft_failed: '⚠️ AI draft failed',
+  campaign_manual_fallback_clicked: '↩ Switched to manual form',
+  campaign_submit_attempted: '🚦 Attempted campaign submit',
+  campaign_submitted: '📣 Posted campaign',
+  campaign_submit_failed: '⚠️ Campaign submit failed',
+  campaign_cancelled: '🗙 Cancelled campaign',
+  campaign_detail_viewed: '👁 Viewed my campaign',
+  pitch_reviewed: '🔍 Reviewed a pitch',
+  pitch_hired: '🤝 Hired a creator',
 };
 
 function eventLabel(t: string): string {

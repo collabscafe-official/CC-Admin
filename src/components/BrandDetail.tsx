@@ -363,30 +363,17 @@ const BrandDetail: React.FC = () => {
           </div>
         </div>
 
-        {/* ── SESSION & DEVICE (new) ── */}
-        {(brand.latest_session?.logged_in_at || brand.signup_metadata?.ip) && (
+        {/* ── SIGNUP CONTEXT & BEHAVIOR (new) ──
+            Per-session device/geo lives on the Brand Activity timeline (collapsed
+            session header chips). This panel is for the two signals that AREN'T
+            per-session: the immutable "where/how they signed up" snapshot, and
+            the rolling behavior view that feeds the AI brand embedding. */}
+        {(brand.signup_metadata?.ip
+          || brand.signup_metadata?.pre_signup_searches?.length
+          || brand.signup_metadata?.pre_signup_viewed_creators?.length) && (
           <div style={{ ...card, marginBottom: 16 }}>
-            <p style={sectionTitle}>Session &amp; Device</p>
+            <p style={sectionTitle}>Signup Context &amp; Behavior</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
-              {/* Latest login panel */}
-              {brand.latest_session?.logged_in_at && (
-                <div style={{ background: 'rgba(16, 185, 129, 0.05)', border: '1px solid rgba(16, 185, 129, 0.2)', borderRadius: 10, padding: 14 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#34d399', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 10 }}>Last Login</div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13 }}>
-                    <div style={{ color: '#f3f4f6', fontWeight: 500 }}>{new Date(brand.latest_session.logged_in_at).toLocaleString()}</div>
-                    <div style={{ color: '#9ca3af' }}>
-                      {[brand.latest_session.geo_city, brand.latest_session.geo_region, brand.latest_session.geo_country].filter(Boolean).join(', ') || 'Unknown location'}
-                    </div>
-                    <div style={{ color: '#9ca3af' }}>
-                      {brand.latest_session.browser_name} {brand.latest_session.browser_version} · {brand.latest_session.os_name} {brand.latest_session.os_version}
-                    </div>
-                    <div style={{ color: '#6b7280', fontSize: 11 }}>
-                      {brand.latest_session.device_type} · IP {brand.latest_session.ip || '—'}
-                    </div>
-                  </div>
-                </div>
-              )}
-
               {/* Signup metadata panel */}
               {brand.signup_metadata?.ip && (
                 <div style={{ background: 'rgba(99, 102, 241, 0.05)', border: '1px solid rgba(99, 102, 241, 0.2)', borderRadius: 10, padding: 14 }}>

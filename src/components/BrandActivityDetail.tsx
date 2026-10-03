@@ -49,6 +49,18 @@ interface Session {
   duration_ms: number;
   event_count: number;
   events: Event[];
+  // Enrichment surfaced per-session by the backend (geoip-lite + ua-parser-js
+  // populated at ingest, then rolled up in getBrandTimeline). Empty strings
+  // when the session predates the enrichment rollout OR the IP is private.
+  ip_address?: string;
+  geo_country?: string;
+  geo_region?: string;
+  geo_city?: string;
+  device_type?: string;
+  browser_name?: string;
+  browser_version?: string;
+  os_name?: string;
+  os_version?: string;
 }
 
 interface TimelineResponse {
@@ -340,12 +352,43 @@ const BrandActivityDetail: React.FC = () => {
                     <div className="font-medium text-white">
                       {fmtTimeOfDay(s.started_at)}
                     </div>
-                    <div className="text-xs text-gray-500">
-                      Session ID: <span className="font-mono">{s.session_id.slice(0, 8)}…</span>
+                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                      <span className="text-xs text-gray-500">
+                        <span className="font-mono">{s.session_id.slice(0, 8)}…</span>
+                      </span>
+                      {/* Geo chip — city, region, country */}
+                      {(s.geo_city || s.geo_country) && (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                          📍 {[s.geo_city, s.geo_region, s.geo_country].filter(Boolean).join(', ')}
+                        </span>
+                      )}
+                      {/* Device chip — type */}
+                      {s.device_type && (
+                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium border ${
+                          s.device_type === 'mobile' ? 'bg-blue-500/15 text-blue-300 border-blue-500/30' :
+                          s.device_type === 'tablet' ? 'bg-purple-500/15 text-purple-300 border-purple-500/30' :
+                          s.device_type === 'bot'    ? 'bg-red-500/15 text-red-300 border-red-500/30' :
+                                                       'bg-gray-500/15 text-gray-300 border-gray-500/30'
+                        }`}>
+                          {s.device_type === 'mobile' ? '📱' : s.device_type === 'tablet' ? '📱' : s.device_type === 'bot' ? '🤖' : '🖥️'} {s.device_type}
+                        </span>
+                      )}
+                      {/* Browser + OS chip */}
+                      {(s.browser_name || s.os_name) && (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-indigo-500/10 text-indigo-300 border border-indigo-500/25">
+                          {s.browser_name} {s.browser_version ? s.browser_version.split('.')[0] : ''} · {s.os_name} {s.os_version ? s.os_version.split('.')[0] : ''}
+                        </span>
+                      )}
+                      {/* IP chip (optional, muted) */}
+                      {s.ip_address && (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono bg-dark-700 text-gray-500 border border-dark-600" title="Client IP">
+                          {s.ip_address}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-4 text-xs text-gray-400">
+                <div className="flex items-center gap-4 text-xs text-gray-400 flex-shrink-0">
                   <span>{s.event_count} events</span>
                   <span>{fmtDuration(s.duration_ms)}</span>
                 </div>

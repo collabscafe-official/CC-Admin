@@ -26,6 +26,20 @@ interface SearchRow {
   brands: BrandRef[];
   first_at: string;
   last_at: string;
+  // CTR + AI-ranking signals added when backend joins explore_results_served
+  ranked_by_distribution?: {
+    cc_pixels_search: number;
+    cc_pixels: number;
+    showcase: number;
+    lifo: number;
+  };
+  zero_result_count?: number;
+  sample_top_5?: string[];
+  sample_ranked_by?: string;
+  clicks_total?: number;
+  sessions_that_clicked?: number;
+  ctr_pct?: number;
+  avg_click_rank?: number | null;
 }
 
 interface ApiResponse {
@@ -194,43 +208,86 @@ const BrandActivitySearches: React.FC = () => {
             <thead className="bg-dark-900 text-gray-400 text-xs uppercase tracking-wide">
               <tr>
                 <th className="text-left px-4 py-3 font-medium">Query</th>
-                <th className="text-right px-4 py-3 font-medium">Count</th>
-                <th className="text-right px-4 py-3 font-medium">Brands</th>
+                <th className="text-left px-4 py-3 font-medium">AI</th>
+                <th className="text-right px-4 py-3 font-medium" title="How often this query was submitted">#</th>
+                <th className="text-right px-4 py-3 font-medium" title="Click-through rate: % of searches where a top result was clicked">CTR</th>
+                <th className="text-right px-4 py-3 font-medium" title="Average rank-position of clicked results (lower is better)">Rank</th>
+                <th className="text-left px-4 py-3 font-medium" title="First 5 creators the AI returned">Top 5 shown</th>
                 <th className="text-left px-4 py-3 font-medium">Searched by</th>
-                <th className="text-left px-4 py-3 font-medium">Last seen</th>
+                <th className="text-left px-4 py-3 font-medium">Last</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-dark-700">
               {loading && (
-                <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-500">Loading…</td></tr>
+                <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-500">Loading…</td></tr>
               )}
               {!loading && items.length === 0 && (
-                <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-500">No searches recorded in this range yet.</td></tr>
+                <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-500">No searches recorded in this range yet.</td></tr>
               )}
               {!loading && items.map((row) => {
                 const referral = isLikelyReferral(row);
+                const zeroResult = (row.zero_result_count ?? 0) > 0 && row.zero_result_count === row.count;
+                const rb = row.sample_ranked_by || 'lifo';
+                const rbColor =
+                  rb === 'cc_pixels_search' ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' :
+                  rb === 'cc_pixels'        ? 'bg-blue-500/20 text-blue-300 border-blue-500/40' :
+                  rb === 'showcase'         ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/40' :
+                                              'bg-gray-500/20 text-gray-300 border-gray-500/40';
+                const rbLabel =
+                  rb === 'cc_pixels_search' ? 'AI SEARCH' :
+                  rb === 'cc_pixels'        ? 'AI BRAND' :
+                  rb === 'showcase'         ? 'SHOWCASE' :
+                                              'LIFO';
+                const ctr = row.ctr_pct ?? 0;
+                const ctrColor =
+                  ctr >= 40 ? 'text-emerald-300' :
+                  ctr >= 15 ? 'text-amber-300' :
+                  ctr > 0   ? 'text-gray-300' :
+                              'text-red-300';
                 return (
-                  <tr key={row.query} className={`hover:bg-dark-700/40 ${referral ? 'bg-amber-500/5' : ''}`}>
+                  <tr key={row.query} className={`hover:bg-dark-700/40 ${referral ? 'bg-amber-500/5' : ''} ${zeroResult ? 'bg-red-500/5' : ''}`}>
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-mono text-white">{row.query}</span>
                         {referral && (
                           <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/40">
                             REFERRAL?
                           </span>
                         )}
+                        {zeroResult && (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-red-500/20 text-red-300 border border-red-500/40" title="Zero results every time this was searched">
+                            0 RESULTS
+                          </span>
+                        )}
                       </div>
                     </td>
+                    <td className="px-4 py-3">
+                      <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold border ${rbColor}`}>
+                        {rbLabel}
+                      </span>
+                    </td>
                     <td className="px-4 py-3 text-right tabular-nums text-white">{row.count}</td>
-                    <td className="px-4 py-3 text-right tabular-nums text-gray-300">
-                      {row.brand_count}
-                      {row.anonymous_count > 0 && (
-                        <span className="text-gray-500 text-xs"> +{row.anonymous_count} anon</span>
-                      )}
+                    <td className={`px-4 py-3 text-right tabular-nums font-semibold ${ctrColor}`} title={`${row.sessions_that_clicked || 0} of ${row.count} searches led to a click`}>
+                      {row.ctr_pct != null ? `${row.ctr_pct}%` : '—'}
+                    </td>
+                    <td className="px-4 py-3 text-right tabular-nums text-gray-300" title="Average position of clicked results — lower is better">
+                      {row.avg_click_rank != null ? row.avg_click_rank.toFixed(1) : '—'}
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex flex-wrap gap-1 max-w-md">
-                        {row.brands.slice(0, 4).map((b) => (
+                      <div className="flex flex-wrap gap-1 max-w-sm">
+                        {(row.sample_top_5 || []).slice(0, 5).map((u, i) => (
+                          <span key={i} className="inline-flex items-center px-1.5 py-0.5 rounded bg-dark-700 text-[11px] font-mono text-gray-400" title={`Rank #${i + 1}`}>
+                            {i + 1}.&nbsp;@{u.replace(/^@+/, '')}
+                          </span>
+                        ))}
+                        {(!row.sample_top_5 || row.sample_top_5.length === 0) && (
+                          <span className="text-xs text-gray-600 italic">—</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex flex-wrap gap-1 max-w-xs">
+                        {row.brands.slice(0, 2).map((b) => (
                           <button
                             key={b._id}
                             onClick={() => navigate(`/brand-activity/${b._id}`)}
@@ -242,11 +299,14 @@ const BrandActivitySearches: React.FC = () => {
                             ) : (
                               <div className="w-4 h-4 rounded-full bg-dark-600" />
                             )}
-                            <span className="truncate max-w-[120px]">{b.brand_name || b.email}</span>
+                            <span className="truncate max-w-[100px]">{b.brand_name || b.email}</span>
                           </button>
                         ))}
-                        {row.brands.length > 4 && (
-                          <span className="text-xs text-gray-500 px-2 py-0.5">+{row.brands.length - 4} more</span>
+                        {row.brands.length > 2 && (
+                          <span className="text-xs text-gray-500 px-1 py-0.5">+{row.brands.length - 2}</span>
+                        )}
+                        {row.anonymous_count > 0 && (
+                          <span className="text-xs text-gray-500 px-1 py-0.5">+{row.anonymous_count} anon</span>
                         )}
                       </div>
                     </td>
@@ -256,6 +316,11 @@ const BrandActivitySearches: React.FC = () => {
               })}
             </tbody>
           </table>
+        </div>
+        <div className="px-4 py-3 border-t border-dark-700 bg-dark-900/50 text-xs text-gray-500 flex items-center gap-4 flex-wrap">
+          <span><span className="inline-block w-2 h-2 rounded-full bg-emerald-400 mr-1" /> CTR ≥ 40% = good match</span>
+          <span><span className="inline-block w-2 h-2 rounded-full bg-amber-400 mr-1" /> 15–40% = ok</span>
+          <span><span className="inline-block w-2 h-2 rounded-full bg-red-400 mr-1" /> &lt; 15% or zero results = investigate</span>
         </div>
       </div>
     </div>

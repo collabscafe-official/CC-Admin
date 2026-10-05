@@ -21,6 +21,7 @@ const SocialSyncStatus = lazy(() => import('./src/components/SocialSyncStatus'))
 const BrandActivity = lazy(() => import('./src/components/BrandActivity'));
 const BrandActivityDetail = lazy(() => import('./src/components/BrandActivityDetail'));
 const BrandActivitySearches = lazy(() => import('./src/components/BrandActivitySearches'));
+const BrandActivityRankingQuality = lazy(() => import('./src/components/BrandActivityRankingQuality'));
 const AdminOrders = lazy(() => import('./src/components/AdminOrders'));
 const AdminOrderDetail = lazy(() => import('./src/components/AdminOrderDetail'));
 const AdminDisputes = lazy(() => import('./src/components/AdminDisputes'));
@@ -155,6 +156,7 @@ const Main: React.FC = () => {
                     <Route path="/social-sync" element={<SocialSyncStatus />} />
                     <Route path="/brand-activity" element={<BrandActivity />} />
                     <Route path="/brand-activity/searches" element={<BrandActivitySearches />} />
+                    <Route path="/brand-activity/ranking-quality" element={<BrandActivityRankingQuality />} />
                     <Route path="/brand-activity/:brandId" element={<BrandActivityDetail />} />
                     <Route path="/orders" element={<AdminOrders />} />
                     <Route path="/orders/:id" element={<AdminOrderDetail />} />

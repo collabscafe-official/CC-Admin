@@ -158,15 +158,26 @@ const BrandActivity: React.FC = () => {
             identify cold accounts, and prioritise outreach.
           </p>
         </div>
-        <button
-          onClick={() => navigate('/brand-activity/searches')}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-dark-800 border border-dark-700 hover:border-primary text-sm font-medium text-gray-200 hover:text-white transition-colors"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
-          Top searches →
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => navigate('/brand-activity/ranking-quality')}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-dark-800 border border-dark-700 hover:border-primary text-sm font-medium text-gray-200 hover:text-white transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 3v18h18M7 14l4-4 4 4 5-5" />
+            </svg>
+            Ranking quality →
+          </button>
+          <button
+            onClick={() => navigate('/brand-activity/searches')}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-dark-800 border border-dark-700 hover:border-primary text-sm font-medium text-gray-200 hover:text-white transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            Top searches →
+          </button>
+        </div>
       </div>
 
       {/* Summary tiles */}

@@ -26,6 +26,8 @@ const AdminOrders = lazy(() => import('./src/components/AdminOrders'));
 const AdminOrderDetail = lazy(() => import('./src/components/AdminOrderDetail'));
 const AdminDisputes = lazy(() => import('./src/components/AdminDisputes'));
 const AdminCustomOffers = lazy(() => import('./src/components/AdminCustomOffers'));
+const AdminCollabs = lazy(() => import('./src/components/AdminCollabs'));
+const AdminCollabDetail = lazy(() => import('./src/components/AdminCollabDetail'));
 const AdminTasks = lazy(() => import('./src/components/AdminTasks'));
 const CampaignsModeration = lazy(() => import('./src/components/CampaignsModeration'));
 const LoginPage = lazy(() => import('./src/components/LoginPage'));
@@ -69,6 +71,8 @@ const Main: React.FC = () => {
                       ? 'Disputes'
                       : pathname.startsWith('/custom-offers')
                         ? 'Custom Offers'
+                        : pathname.startsWith('/collabs')
+                        ? 'Collabs'
                         : pathname.startsWith('/tasks')
                           ? 'Tasks'
                           : pathname.startsWith('/campaigns')
@@ -109,6 +113,9 @@ const Main: React.FC = () => {
         break;
       case 'Custom Offers':
         navigate('/custom-offers');
+        break;
+      case 'Collabs':
+        navigate('/collabs');
         break;
       case 'Tasks':
         navigate('/tasks');
@@ -162,6 +169,8 @@ const Main: React.FC = () => {
                     <Route path="/orders/:id" element={<AdminOrderDetail />} />
                     <Route path="/disputes" element={<AdminDisputes />} />
                     <Route path="/custom-offers" element={<AdminCustomOffers />} />
+                    <Route path="/collabs" element={<AdminCollabs />} />
+                    <Route path="/collabs/:chatId" element={<AdminCollabDetail />} />
                     <Route path="/tasks" element={<AdminTasks />} />
                     <Route path="/campaigns" element={<CampaignsModeration />} />
                     <Route path="/login" element={<Navigate to="/dashboard" replace />} />

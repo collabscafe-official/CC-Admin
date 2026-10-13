@@ -103,12 +103,14 @@ interface ChatMessage {
   _id: string;
   chat_id: string;
   sender?: { user_id: string; type: 'brand' | 'influencer' };
-  message_type: 'text' | 'image' | 'video' | 'audio' | 'file' | 'system' | 'brief';
+  message_type: 'text' | 'image' | 'video' | 'audio' | 'file' | 'system' | 'brief' | 'offer';
   text?: string;
   media?: { url?: string; name?: string; mime_type?: string; size?: number; duration?: number };
   brief_data?: any;
   system_event?: string;
   system_metadata?: any;
+  // Direct Message offer card snapshot (live status lives on Backend-V2)
+  offer_data?: { offer_id?: string; proposed_by?: 'brand' | 'influencer'; is_request?: boolean; note?: string; deliverables_summary?: string; amount?: number; currency?: string; deadline_days?: number };
   created_at?: string;
 }
 
@@ -161,7 +163,8 @@ function getInitials(name?: string) {
 
 // ── Chat history viewer (read-only embed) ────────────────────────────────────
 
-const ChatHistoryViewer: React.FC<{ chatId: string | null; brand?: BrandData | null; creator?: Influencer }> = ({ chatId, brand, creator }) => {
+// Exported: also used by AdminCollabDetail (Direct Message threads).
+export const ChatHistoryViewer: React.FC<{ chatId: string | null; brand?: BrandData | null; creator?: Influencer }> = ({ chatId, brand, creator }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -287,6 +290,24 @@ const ChatHistoryViewer: React.FC<{ chatId: string | null; brand?: BrandData | n
                 {m.brief_data?.goal && <div className="text-xs text-gray-300 mb-1"><span className="text-gray-500">Goal:</span> {m.brief_data.goal}</div>}
                 {m.brief_data?.anything_else && <div className="text-xs text-gray-300 italic line-clamp-3">{m.brief_data.anything_else}</div>}
                 <div className="text-[10px] text-gray-500 mt-1.5">{formatDateTime(m.created_at)}</div>
+              </div>
+            );
+          }
+          // Offer card (Direct Message flow) — terms snapshot
+          if (m.message_type === 'offer') {
+            const o = m.offer_data || {};
+            const fromBrand = m.sender?.type === 'brand';
+            return (
+              <div key={m._id || idx} className={`flex ${fromBrand ? 'justify-end' : 'justify-start'}`}>
+                <div className="max-w-[80%] my-1 p-3 rounded-lg border border-violet-500/30 bg-violet-500/5">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-violet-300 mb-1">
+                    {o.is_request ? '📩 Collab request' : '💼 Offer'} · {fromBrand ? brand?.brand_name || 'Brand' : creator?.name || creator?.username || 'Creator'}
+                  </div>
+                  {o.note && <div className="text-xs text-gray-300 mb-1 whitespace-pre-wrap">{o.note}</div>}
+                  <div className="text-xs text-gray-200"><span className="text-gray-500">Deliverables:</span> {o.deliverables_summary || '—'}</div>
+                  <div className="text-sm text-emerald-300 font-mono font-bold mt-1">{formatAmount(o.amount, o.currency)}{o.deadline_days ? <span className="text-gray-400 font-sans font-normal text-xs"> · {o.deadline_days} days after payment</span> : null}</div>
+                  <div className="text-[10px] text-gray-500 mt-1.5">{formatDateTime(m.created_at)}</div>
+                </div>
               </div>
             );
           }

@@ -37,6 +37,7 @@ interface Event {
   target_type?: string;
   duration_ms?: number;
   viewed_duration_ms?: number; // attached server-side for creator_profile_viewed
+  pre_signup?: boolean; // guest event from this brand's session, before they signed up (stitched server-side)
   metadata?: Record<string, any>;
   captured_at: string;
   target_creator?: CreatorRef | null;
@@ -467,13 +468,21 @@ const BrandActivityDetail: React.FC = () => {
                           <span className="text-xs text-gray-500 font-mono mt-0.5 whitespace-nowrap">
                             {new Date(e.captured_at).toLocaleTimeString()}
                           </span>
-                          <span className="text-gray-200 whitespace-nowrap">{eventLabel(e.event_type)}</span>
+                          <span className="text-gray-200 whitespace-nowrap">
+                            {eventLabel(e.event_type)}
+                            {e.pre_signup && (
+                              <span className="ml-2 px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 text-[10px] font-semibold uppercase tracking-wide align-middle" title="Done as a guest in the same visit, before signing up">
+                                before signup
+                              </span>
+                            )}
+                          </span>
                           <span className="text-xs text-gray-500 truncate min-w-0 flex-1">
                             {e.target_creator
                               ? `@${e.target_creator.username || e.target_creator.name}`
                               : e.page_url || ''}
                             {e.metadata?.search_query ? ` "${e.metadata.search_query}"` : ''}
                             {e.metadata?.amount ? ` · ${e.metadata.amount} ${e.metadata.currency || ''}` : ''}
+                            {e.metadata?.surface ? ` · via ${({ inline: 'button under bio', bar: 'bottom bar', card: 'booking card' } as Record<string, string>)[e.metadata.surface] || e.metadata.surface}` : ''}
                             {e.event_type === 'explore_filter_applied' && (() => {
                               const af = e.metadata?.applied_filters;
                               // New shape (key→value object). Renders pills like "GENDER: Female".

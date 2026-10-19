@@ -170,6 +170,46 @@ const EVENT_LABELS: Record<string, string> = {
   campaign_detail_viewed: '👁 Viewed my campaign',
   pitch_reviewed: '🔍 Reviewed a pitch',
   pitch_hired: '🤝 Hired a creator',
+  // Explore / checkout internals
+  explore_results_served: '🗂 Explore results shown',
+  checkout_payload_composed: '🧾 Prepared payment',
+  // Creator profile (2026-10 redesign)
+  profile_tab_switched: '🗂 Switched profile tab',
+  profile_content_opened: '🖼 Opened creator content',
+  profile_package_selected: '📦 Selected a package',
+  profile_book_clicked: '🛒 Clicked Book',
+  profile_social_opened: '🔗 Opened creator social',
+  profile_faq_opened: '❓ Opened an FAQ',
+  profile_bio_expanded: '📖 Read full bio',
+  // TrustLens AI
+  trustlens_card_viewed: '🔬 Saw TrustLens',
+  trustlens_tab_switched: '🔀 Switched TrustLens platform',
+  trustlens_learn_more_clicked: '📘 Clicked TrustLens learn more',
+  // Guest gates → sign-up popup
+  guest_explore_limit_hit: '🚧 Guest hit Explore limit',
+  guest_profile_limit_hit: '🚧 Guest hit profile limit',
+  guest_social_pill_blocked: '🔒 Guest blocked: social link',
+  guest_trustlens_gated: '🔒 Guest blocked: TrustLens',
+  guest_stats_gated: '🔒 Guest blocked: stats',
+  guest_join_modal_opened: '🪟 Sign-up popup opened',
+  guest_join_modal_submitted: '📝 Sign-up submitted',
+  guest_join_modal_signup_success: '✅ Signed up from popup',
+  guest_join_modal_signup_failed: '⚠️ Popup sign-up failed',
+  guest_join_modal_login_clicked: '🔑 Popup: chose log in',
+  // Direct Message → Collab flow
+  collab_message_clicked: '💬 Clicked Message',
+  collab_compose_opened: '✏️ Opened message form',
+  collab_ai_draft_requested: '✨ Requested AI brief',
+  collab_ai_draft_succeeded: '🤖 AI brief returned',
+  collab_ai_draft_failed: '⚠️ AI brief failed',
+  collab_request_sent: '📨 Sent collab request',
+  collab_request_failed: '⚠️ Collab request failed',
+  collab_thread_viewed: '👁 Viewed collab thread',
+  collab_offer_sent: '💸 Sent an offer',
+  collab_offer_accepted: '🤝 Accepted an offer',
+  collab_offer_declined: '🙅 Declined an offer',
+  collab_offer_withdrawn: '↩ Withdrew an offer',
+  collab_checkout_started: '💳 Started collab checkout',
 };
 
 function eventLabel(t: string): string {

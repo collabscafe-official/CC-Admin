@@ -2,7 +2,7 @@ import collabs from "../../config/collabs";
 import { GET_CREATORS } from "../types";
 import { toast } from "react-toastify";
 
-export const getCreators = (limit = 10, page = 1, is_active = '', is_email_verified = '', is_profile_completed = '', is_approved_by_admin = '', is_featured = '', country = '', state = '', city = '', gender = '', callback) => {
+export const getCreators = (limit = 10, page = 1, is_active = '', is_email_verified = '', is_profile_completed = '', is_approved_by_admin = '', is_featured = '', country = '', state = '', city = '', gender = '', callback, q = '') => {
     return async (dispatch) => {
         try {
             // Build query parameters - only include non-empty values
@@ -19,6 +19,8 @@ export const getCreators = (limit = 10, page = 1, is_active = '', is_email_verif
             if (state !== '') params.append('state', state);
             if (city !== '') params.append('city', city);
             if (gender !== '') params.append('gender', gender);
+            // Server-side search across all creators (name, @username, email, phone)
+            if (q) params.append('q', q);
             
             const queryString = params.toString();
             const response = await collabs.get(`/admin/influencers/list?${queryString}`);

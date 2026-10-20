@@ -171,6 +171,14 @@ export const ChatHistoryViewer: React.FC<{ chatId: string | null; brand?: BrandD
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const initialFetchKey = useRef<string | null>(null);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const scrolledFor = useRef<string | null>(null);
+  // Open at the newest message once the conversation has loaded.
+  useEffect(() => {
+    if (!chatId || loading || !messages.length || scrolledFor.current === chatId) return;
+    scrolledFor.current = chatId;
+    requestAnimationFrame(() => { if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight; });
+  }, [chatId, loading, messages.length]);
 
   // Load first page when chatId changes
   useEffect(() => {
@@ -186,15 +194,23 @@ export const ChatHistoryViewer: React.FC<{ chatId: string | null; brand?: BrandD
       setLoading(true);
       setError(null);
       try {
-        const res = await collabs.post('/admin/chats/messages', { chat_id: chatId, limit: 50 });
-        if (cancelled) return;
-        if (res?.data?.success && res?.data?.data) {
-          setMessages(res.data.data.messages || []);
-          setNextCursor(res.data.data.pagination?.nextCursor || null);
-          setHasMore(!!res.data.data.pagination?.hasMore);
-        } else {
-          setMessages([]);
+        // Load the whole conversation up front (200 per request, up to 10
+        // requests) so admins never have to press "Load older messages".
+        let all: ChatMessage[] = [];
+        let cursor: string | null = null;
+        let more = false;
+        for (let pageNo = 0; pageNo < 10; pageNo++) {
+          const res: any = await collabs.post('/admin/chats/messages', { chat_id: chatId, limit: 200, ...(cursor ? { cursor } : {}) });
+          if (cancelled) return;
+          if (!res?.data?.success || !res?.data?.data) break;
+          all = [...(res.data.data.messages || []), ...all];
+          cursor = res.data.data.pagination?.nextCursor || null;
+          more = !!res.data.data.pagination?.hasMore && !!cursor;
+          if (!more) break;
         }
+        setMessages(all);
+        setNextCursor(cursor);
+        setHasMore(more);
       } catch (err: any) {
         if (cancelled) return;
         setError(err?.response?.data?.message || 'Failed to load chat history.');
@@ -210,7 +226,7 @@ export const ChatHistoryViewer: React.FC<{ chatId: string | null; brand?: BrandD
     if (!chatId || !nextCursor || loading) return;
     setLoading(true);
     try {
-      const res = await collabs.post('/admin/chats/messages', { chat_id: chatId, cursor: nextCursor, limit: 50 });
+      const res = await collabs.post('/admin/chats/messages', { chat_id: chatId, cursor: nextCursor, limit: 200 });
       if (res?.data?.success && res?.data?.data) {
         const older = res.data.data.messages || [];
         setMessages(prev => [...older, ...prev]);
@@ -233,7 +249,8 @@ export const ChatHistoryViewer: React.FC<{ chatId: string | null; brand?: BrandD
   }
 
   return (
-    <div className="bg-dark-800 border border-dark-700 rounded-xl flex flex-col" style={{ maxHeight: 600 }}>
+    // Phones: no inner scroll box (the page scrolls); desktop keeps a 600px panel.
+    <div className="bg-dark-800 border border-dark-700 rounded-xl flex flex-col md:max-h-[600px]">
       {/* Header */}
       <div className="px-4 py-3 border-b border-dark-700 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-2.5 min-w-0">
@@ -249,7 +266,7 @@ export const ChatHistoryViewer: React.FC<{ chatId: string | null; brand?: BrandD
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
+      <div ref={scrollRef} className="flex-1 md:overflow-y-auto px-3 md:px-4 py-3 space-y-2">
         {hasMore && (
           <button
             onClick={loadOlder}

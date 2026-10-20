@@ -569,6 +569,7 @@ const Influencers: React.FC = () => {
   const debouncedCountry = useDebounce(filters.country, 500);
   const debouncedState   = useDebounce(filters.state,   500);
   const debouncedCity    = useDebounce(filters.city,    500);
+  const debouncedSearch  = useDebounce(searchQuery.trim(), 300);
 
   const activeFilterCount = useMemo(() => {
     const { status, ...rest } = filters;
@@ -658,16 +659,19 @@ const Influencers: React.FC = () => {
 
   useEffect(() => {
     setIsLoading(true);
+    // Search runs on the server across every creator (it used to load the
+    // newest 1000 and filter here, so older creators were unfindable).
     dispatch(getCreators(
-      searchQuery ? 1000 : itemsPerPage,
-      searchQuery ? 1 : currentPage,
+      itemsPerPage,
+      currentPage,
       filters.is_active, filters.is_email_verified, filters.is_profile_completed,
       filters.is_approved_by_admin, filters.is_featured,
       debouncedCountry, debouncedState, debouncedCity, filters.gender,
-      (_success: boolean) => { setIsLoading(false); }
+      (_success: boolean) => { setIsLoading(false); },
+      debouncedSearch,
     ) as unknown as any);
   }, [
-    dispatch, searchQuery, itemsPerPage, currentPage,
+    dispatch, debouncedSearch, itemsPerPage, currentPage,
     filters.is_active, filters.is_email_verified, filters.is_profile_completed,
     filters.is_approved_by_admin, filters.is_featured,
     debouncedCountry, debouncedState, debouncedCity, filters.gender,
@@ -681,13 +685,8 @@ const Influencers: React.FC = () => {
 
   const filteredInfluencers = useMemo(() => {
     if (!creators?.profiles || !Array.isArray(creators.profiles)) return [];
-    if (!searchQuery) return creators.profiles;
-    const q = searchQuery.toLowerCase();
-    return creators.profiles.filter((inf: any) =>
-      inf.name?.toLowerCase().includes(q) ||
-      inf.email?.toLowerCase().includes(q)
-    );
-  }, [creators?.profiles, searchQuery]);
+    return creators.profiles; // already filtered by the server
+  }, [creators?.profiles]);
 
   const totalCount = creators?.pagination?.total_count ?? 0;
   const totalPages = totalCount ? Math.ceil(totalCount / itemsPerPage) : 1;
@@ -774,7 +773,7 @@ const Influencers: React.FC = () => {
             </span>
             <input
               type="text"
-              placeholder="Search by name…"
+              placeholder="Search name, @username, email or phone…"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               className="inf-input"

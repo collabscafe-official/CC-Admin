@@ -385,10 +385,10 @@ const BrandActivityDetail: React.FC = () => {
             <div key={s.session_id} className="bg-dark-800 border border-dark-700 rounded-lg overflow-hidden">
               <button
                 onClick={() => toggleSession(s.session_id)}
-                className="w-full flex items-center justify-between px-4 py-3 hover:bg-dark-700/40 transition-colors text-left"
+                className="w-full flex items-center justify-between gap-2 px-3 md:px-4 py-3 hover:bg-dark-700/40 transition-colors text-left"
               >
-                <div className="flex items-center gap-3 text-sm flex-1 min-w-0">
-                  <span className="text-gray-500 font-mono text-xs w-12">{open ? '▼' : '▶'}</span>
+                <div className="flex items-center gap-2 md:gap-3 text-sm flex-1 min-w-0">
+                  <span className="text-gray-500 font-mono text-xs w-4 md:w-12 flex-shrink-0">{open ? '▼' : '▶'}</span>
                   <div className="min-w-0">
                     <div className="font-medium text-white">
                       {fmtTimeOfDay(s.started_at)}
@@ -429,7 +429,7 @@ const BrandActivityDetail: React.FC = () => {
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-4 text-xs text-gray-400 flex-shrink-0">
+                <div className="flex flex-col md:flex-row items-end md:items-center gap-0.5 md:gap-4 text-xs text-gray-400 flex-shrink-0 whitespace-nowrap">
                   <span>{s.event_count} events</span>
                   <span>{fmtDuration(s.duration_ms)}</span>
                 </div>
@@ -463,12 +463,13 @@ const BrandActivityDetail: React.FC = () => {
                       return (
                         <li
                           key={e._id}
-                          className={`px-4 py-2.5 flex items-start gap-3 text-sm ${longView ? 'bg-blue-500/5' : ''}`}
+                          // Phones: time + event on one line, details wrap underneath (they were squeezed to nothing).
+                          className={`px-3 md:px-4 py-2.5 flex flex-wrap md:flex-nowrap items-start gap-x-3 gap-y-0.5 text-sm ${longView ? 'bg-blue-500/5' : ''}`}
                         >
                           <span className="text-xs text-gray-500 font-mono mt-0.5 whitespace-nowrap">
                             {new Date(e.captured_at).toLocaleTimeString()}
                           </span>
-                          <span className="text-gray-200 whitespace-nowrap">
+                          <span className="text-gray-200 min-w-0 md:whitespace-nowrap">
                             {eventLabel(e.event_type)}
                             {e.pre_signup && (
                               <span className="ml-2 px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 text-[10px] font-semibold uppercase tracking-wide align-middle" title="Done as a guest in the same visit, before signing up">
@@ -476,7 +477,7 @@ const BrandActivityDetail: React.FC = () => {
                               </span>
                             )}
                           </span>
-                          <span className="text-xs text-gray-500 truncate min-w-0 flex-1">
+                          <span className="text-xs text-gray-500 min-w-0 basis-full md:basis-auto md:flex-1 break-words md:truncate">
                             {e.target_creator
                               ? `@${e.target_creator.username || e.target_creator.name}`
                               : e.page_url || ''}

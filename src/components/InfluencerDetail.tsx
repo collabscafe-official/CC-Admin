@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useLocation, useParams, useNavigate } from 'react-router-dom';
 import { approveCreator, declineCreator } from '../store/actions/creatorAction';
@@ -7,6 +7,7 @@ import ContentHighlights from './ContentHighlights';
 import FaqsSection from './FaqsSection';
 import TrustLensAdminPanel from './TrustLensAdminPanel';
 import DeclineCreatorModal from './DeclineCreatorModal';
+import collabs from '../config/collabs';
 
 const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
   const baseClasses = "px-2 py-1 text-xs font-medium rounded-full inline-block";
@@ -116,7 +117,22 @@ const InfluencerDetail: React.FC = () => {
   const [showDeclineModal, setShowDeclineModal] = useState(false);
   const [isDeclining, setIsDeclining] = useState(false);
 
-  const influencer = location.state?.influencer || creators?.profiles?.find((p: any) => p._id === id);
+  const known = location.state?.influencer || creators?.profiles?.find((p: any) => p._id === id);
+  // Opened from Collabs, Brand Activity or a pasted link: the creator isn't in
+  // the loaded list, so fetch just this one by id.
+  const [fetched, setFetched] = useState<any>(null);
+  const [fetchState, setFetchState] = useState<'idle' | 'loading' | 'done'>('idle');
+  useEffect(() => {
+    if (known || !id) return;
+    let alive = true;
+    setFetchState('loading');
+    collabs.get(`/admin/influencers/list?id=${encodeURIComponent(id)}&limit=1&page=1`)
+      .then((r: any) => { if (alive) setFetched(r?.data?.data?.profiles?.[0] || null); })
+      .catch(() => { if (alive) setFetched(null); })
+      .finally(() => { if (alive) setFetchState('done'); });
+    return () => { alive = false; };
+  }, [id, known]);
+  const influencer = known || fetched;
   const savedPage = location.state?.currentPage || 1;
   const savedItemsPerPage = location.state?.itemsPerPage || 10;
 
@@ -160,7 +176,7 @@ const InfluencerDetail: React.FC = () => {
   if (!influencer) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-gray-500">Influencer not found.</div>
+        <div className="text-gray-500">{fetchState === 'done' || !id ? 'Influencer not found.' : 'Loading…'}</div>
       </div>
     );
   }

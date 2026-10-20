@@ -11,7 +11,7 @@ import collabs from '../config/collabs';
 interface Party { _id: string; name?: string; username?: string; email?: string; profile_image?: string }
 interface CollabRow {
     chat_id: string;
-    stage: 'request' | 'negotiating' | 'awaiting_payment' | 'paid' | 'closed';
+    stage: 'request' | 'talking' | 'negotiating' | 'awaiting_payment' | 'paid' | 'closed';
     brand: Party | null;
     creator: Party | null;
     latest_offer: { status: string; amount: number; currency?: string; proposed_by?: string; deliverables_summary?: string; pay_by?: string; order_id?: string | null };
@@ -23,7 +23,8 @@ interface CollabRow {
 
 export const STAGE_STYLES: Record<string, { label: string; bg: string; text: string }> = {
     request:          { label: 'Request (no reply)', bg: 'bg-amber-500/15',   text: 'text-amber-300' },
-    negotiating:      { label: 'Talking',            bg: 'bg-violet-500/15',  text: 'text-violet-300' },
+    talking:          { label: 'Talking',            bg: 'bg-sky-500/15',     text: 'text-sky-300' },     // creator replied, no counter-offer yet
+    negotiating:      { label: 'Negotiating',        bg: 'bg-violet-500/15',  text: 'text-violet-300' },  // a counter-offer is pending
     awaiting_payment: { label: 'Awaiting payment',   bg: 'bg-blue-500/15',    text: 'text-blue-300' },
     paid:             { label: 'Paid',               bg: 'bg-emerald-500/15', text: 'text-emerald-300' },
     closed:           { label: 'Closed',             bg: 'bg-gray-500/15',    text: 'text-gray-300' },
@@ -32,7 +33,8 @@ export const STAGE_STYLES: Record<string, { label: string; bg: string; text: str
 const TABS: { key: string; label: string }[] = [
     { key: '', label: 'All' },
     { key: 'request', label: 'Requests' },
-    { key: 'negotiating', label: 'Talking' },
+    { key: 'talking', label: 'Talking' },
+    { key: 'negotiating', label: 'Negotiating' },
     { key: 'awaiting_payment', label: 'Awaiting payment' },
     { key: 'paid', label: 'Paid' },
     { key: 'closed', label: 'Closed' },

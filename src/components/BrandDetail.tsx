@@ -369,11 +369,33 @@ const BrandDetail: React.FC = () => {
             per-session: the immutable "where/how they signed up" snapshot, and
             the rolling behavior view that feeds the AI brand embedding. */}
         {(brand.signup_metadata?.ip
+          || brand.first_touch?.source
           || brand.signup_metadata?.pre_signup_searches?.length
           || brand.signup_metadata?.pre_signup_viewed_creators?.length) && (
           <div style={{ ...card, marginBottom: 16 }}>
             <p style={sectionTitle}>Signup Context &amp; Behavior</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
+              {/* First touch: where the brand first came from (SEO_PLAN.md 1.5) */}
+              {brand.first_touch?.source && (
+                <div style={{ background: 'rgba(16, 185, 129, 0.05)', border: '1px solid rgba(16, 185, 129, 0.2)', borderRadius: 10, padding: 14 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#6ee7b7', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 10 }}>First Visit</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13 }}>
+                    <div style={{ color: '#e5e7eb', fontWeight: 600, textTransform: 'capitalize' }}>
+                      {String(brand.first_touch.source).replace(/_/g, ' ')}
+                      <span style={{ color: '#6b7280', fontWeight: 400, textTransform: 'none' }}> · {brand.first_touch.medium || '—'}</span>
+                    </div>
+                    <div style={{ color: '#9ca3af', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={brand.first_touch.landing_path}>
+                      Landed on: {brand.first_touch.landing_creator_username ? `@${String(brand.first_touch.landing_creator_username).replace(/^@/, '')} (creator profile)` : (brand.first_touch.landing_path || '/')}
+                    </div>
+                    {brand.first_touch.referrer_host && (
+                      <div style={{ color: '#6b7280', fontSize: 11 }}>Referrer: {brand.first_touch.referrer_host}</div>
+                    )}
+                    {brand.first_touch.first_seen_at && (
+                      <div style={{ color: '#6b7280', fontSize: 11 }}>First seen: {new Date(brand.first_touch.first_seen_at).toLocaleString()}</div>
+                    )}
+                  </div>
+                </div>
+              )}
               {/* Signup metadata panel */}
               {brand.signup_metadata?.ip && (
                 <div style={{ background: 'rgba(99, 102, 241, 0.05)', border: '1px solid rgba(99, 102, 241, 0.2)', borderRadius: 10, padding: 14 }}>

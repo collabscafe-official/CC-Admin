@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import ANALYTICS_CONFIG from '../config/analyticsService';
+import { adminServiceHeaders } from '../config/adminServiceHeaders';
 
 // Admin-only inline TrustLens AI panel. Shows the same v2 outputs that V5
 // renders on the public creator profile, PLUS the per-signal calculation
@@ -12,7 +13,7 @@ import ANALYTICS_CONFIG from '../config/analyticsService';
 const BASE = ANALYTICS_CONFIG.BASE_URL;
 const API_KEY = ANALYTICS_CONFIG.API_KEY;
 const apiHeaders = (): Record<string, string> => ({
-  'x-api-key': API_KEY,
+  ...adminServiceHeaders(API_KEY),
 });
 
 type Platform = 'instagram' | 'youtube' | 'tiktok';

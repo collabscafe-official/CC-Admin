@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import ANALYTICS_CONFIG from '../config/analyticsService';
+import { adminServiceHeaders } from '../config/adminServiceHeaders';
 
 const BASE = ANALYTICS_CONFIG.BASE_URL;
 const API_KEY = ANALYTICS_CONFIG.API_KEY;
 const apiHeaders = (): Record<string, string> => ({
-  'x-api-key': API_KEY,
+  ...adminServiceHeaders(API_KEY),
   'Content-Type': 'application/json',
 });
 

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import EMAIL_CONFIG from '../config/emailService';
+import { adminServiceHeaders } from '../config/adminServiceHeaders';
 
 // ── API config ────────────────────────────────────────────────────────────────
 const EMAIL_SERVICE_URL = EMAIL_CONFIG.BASE_URL;
@@ -68,7 +69,7 @@ function fmtDateTime(d?: string) {
   return new Date(d).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 function apiHeaders(json = false) {
-  const h: Record<string, string> = { 'x-api-key': EMAIL_API_KEY };
+  const h: Record<string, string> = { ...adminServiceHeaders(EMAIL_API_KEY) };
   if (json) h['Content-Type'] = 'application/json';
   return h;
 }

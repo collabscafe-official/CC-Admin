@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import ANALYTICS_CONFIG from '../config/analyticsService';
+import { adminServiceHeaders } from '../config/adminServiceHeaders';
 
 const BASE = ANALYTICS_CONFIG.BASE_URL;
 const API_KEY = ANALYTICS_CONFIG.API_KEY;
@@ -34,7 +35,7 @@ const Ga4QuotaAlert: React.FC = () => {
     (async () => {
       try {
         const res = await fetch(`${BASE}/social/admin/ga4-quota`, {
-          headers: { 'x-api-key': API_KEY },
+          headers: { ...adminServiceHeaders(API_KEY) },
         });
         if (!res.ok) return;
         const body = (await res.json()) as QuotaResponse;

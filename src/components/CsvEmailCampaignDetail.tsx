@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import EMAIL_CONFIG from '../config/emailService';
+import { adminServiceHeaders } from '../config/adminServiceHeaders';
 
 const EMAIL_SERVICE_URL = EMAIL_CONFIG.BASE_URL;
 const EMAIL_API_KEY = EMAIL_CONFIG.API_KEY;
@@ -56,7 +57,7 @@ function fmtDate(d?: string) {
 }
 
 function apiHeaders() {
-  return { 'x-api-key': EMAIL_API_KEY };
+  return { ...adminServiceHeaders(EMAIL_API_KEY) };
 }
 
 // Substitute campaign variables with sample values so the preview iframe

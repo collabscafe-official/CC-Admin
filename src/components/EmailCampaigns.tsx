@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import EMAIL_CONFIG from '../config/emailService';
+import { adminServiceHeaders } from '../config/adminServiceHeaders';
 
 // ── API config ────────────────────────────────────────────────────────────────
 const EMAIL_SERVICE_URL = EMAIL_CONFIG.BASE_URL;
@@ -270,7 +271,7 @@ function fmtDate(d?: string) {
 }
 
 function apiHeaders(json = false) {
-  const h: Record<string, string> = { 'x-api-key': EMAIL_API_KEY };
+  const h: Record<string, string> = { ...adminServiceHeaders(EMAIL_API_KEY) };
   if (json) h['Content-Type'] = 'application/json';
   return h;
 }

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import EMAIL_CONFIG from '../config/emailService';
+import { adminServiceHeaders } from '../config/adminServiceHeaders';
 
 const EMAIL_SERVICE_URL = EMAIL_CONFIG.BASE_URL;
 const EMAIL_API_KEY = EMAIL_CONFIG.API_KEY;
@@ -88,7 +89,7 @@ function fmtDate(d?: string) {
 }
 
 function apiHeaders(json = false) {
-  const h: Record<string, string> = { 'x-api-key': EMAIL_API_KEY };
+  const h: Record<string, string> = { ...adminServiceHeaders(EMAIL_API_KEY) };
   if (json) h['Content-Type'] = 'application/json';
   return h;
 }
@@ -531,7 +532,7 @@ export default function CsvEmailCampaigns() {
       form.append('file', file);
       const res = await fetch(`${EMAIL_SERVICE_URL}/csv-campaigns/parse`, {
         method: 'POST',
-        headers: { 'x-api-key': EMAIL_API_KEY },
+        headers: { ...adminServiceHeaders(EMAIL_API_KEY) },
         body: form,
       });
       const data = await res.json();
@@ -1034,7 +1035,7 @@ export default function CsvEmailCampaigns() {
             <div className="cc-card" style={{ position: 'sticky', top: 20 }}>
               <p className="cc-section-label">Template Preview</p>
               <div style={{ borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.07)' }}>
-                <iframe
+                <iframe sandbox=""
                   srcDoc={buildPreview(htmlContent)}
                   style={{ width: '100%', height: 480, border: 'none', display: 'block', background: '#f4f4f5' }}
                   title="Email preview"
@@ -1184,7 +1185,7 @@ export default function CsvEmailCampaigns() {
                   </span>
                 </div>
                 <div className="cc-emod-iframe-wrap">
-                  <iframe
+                  <iframe sandbox=""
                     srcDoc={pendingPreviewHtml}
                     style={{
                       width: previewMode === 'mobile' ? 390 : '100%',

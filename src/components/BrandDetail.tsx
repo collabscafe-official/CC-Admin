@@ -2,6 +2,7 @@ import React from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { getBrands } from '../store/actions/brandAction';
+import BrandAiInsightCard from './BrandAiInsightCard';
 
 // ── Styles ─────────────────────────────────────────────────────────────────────
 
@@ -471,6 +472,9 @@ const BrandDetail: React.FC = () => {
             )}
           </div>
         )}
+
+        {/* ── WHAT OUR AI KNOWS (CC Pixels) ── */}
+        <BrandAiInsightCard brandId={brand._id} card={card} sectionTitle={sectionTitle} />
 
         {/* ── TEAM MEMBERS ── */}
         {teamMembers.length > 0 && (

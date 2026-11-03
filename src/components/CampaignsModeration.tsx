@@ -16,6 +16,9 @@ interface Campaign {
     brief: string;
     status: string;
     rejection_reason?: string;
+    is_disabled?: boolean;
+    disabled_at?: string;
+    disabled_reason?: string;
     pitches_count?: number;
     submitted_at?: string;
     approved_at?: string;
@@ -132,6 +135,33 @@ const CampaignsModeration: React.FC = () => {
         }
     }
 
+    // Disable hides the campaign from creators (browse, detail, pitch) and
+    // blocks the brand from selecting. Reversible; status/pitches untouched.
+    async function toggleDisabled(c: Campaign) {
+        const disabling = !c.is_disabled;
+        let reason = '';
+        if (disabling) {
+            const r = prompt(`Disable "${c.title}"? Creators will no longer see it.\n\nInternal note (optional, brand does not see this):`, '');
+            if (r === null) return;
+            reason = r;
+        } else if (!confirm(`Enable "${c.title}" again? Creators will see it if it is still active.`)) {
+            return;
+        }
+        setBusyId(c._id);
+        try {
+            const res = await collabs.post('/admin/campaigns/set-disabled', { id: c._id, disabled: disabling, reason });
+            if (res.data?.success) {
+                fetchQueue();
+            } else {
+                alert(res.data?.message || 'Could not update campaign.');
+            }
+        } catch (err: any) {
+            alert(err?.response?.data?.message || 'Something went wrong.');
+        } finally {
+            setBusyId(null);
+        }
+    }
+
     async function reject() {
         if (!rejectModal) return;
         const reason = rejectReason.trim();
@@ -238,6 +268,14 @@ const CampaignsModeration: React.FC = () => {
                                         >
                                             {statusLabel}
                                         </span>
+                                        {c.is_disabled && (
+                                            <span
+                                                className="px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider"
+                                                style={{ color: '#ef4444', background: 'rgba(239,68,68,0.15)' }}
+                                            >
+                                                Disabled
+                                            </span>
+                                        )}
                                     </div>
 
                                     {/* Campaign summary */}
@@ -272,6 +310,13 @@ const CampaignsModeration: React.FC = () => {
                                         </div>
                                     )}
 
+                                    {c.is_disabled && (
+                                        <div className="text-xs text-red-300 bg-red-900/20 border border-red-800/50 rounded p-2 mb-3">
+                                            <strong>Hidden from creators</strong> since {formatWhen(c.disabled_at)}
+                                            {c.disabled_reason ? ` · ${c.disabled_reason}` : ''}
+                                        </div>
+                                    )}
+
                                     {/* Brief — collapsed by default; long briefs need a click to expand */}
                                     <div className="text-sm text-gray-300 whitespace-pre-wrap">
                                         {isExpanded
@@ -287,6 +332,20 @@ const CampaignsModeration: React.FC = () => {
                                         </button>
                                     )}
                                 </div>
+
+                                {!isActionable && (
+                                    <div className="flex flex-col gap-2 min-w-[130px]">
+                                        <button
+                                            onClick={() => toggleDisabled(c)}
+                                            disabled={busyId === c._id}
+                                            className={`px-4 py-2 disabled:opacity-50 text-white rounded font-medium text-sm ${
+                                                c.is_disabled ? 'bg-green-600 hover:bg-green-700' : 'bg-red-700 hover:bg-red-800'
+                                            }`}
+                                        >
+                                            {busyId === c._id ? 'Working…' : c.is_disabled ? 'Enable' : 'Disable'}
+                                        </button>
+                                    </div>
+                                )}
 
                                 {isActionable && (
                                     <div className="flex flex-col gap-2 min-w-[130px]">

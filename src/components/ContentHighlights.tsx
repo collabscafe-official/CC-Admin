@@ -26,9 +26,11 @@ const ContentHighlights: React.FC<ContentHighlightsProps> = ({ highlights }) => 
     }
 
     return (
-        <div className="mt-8">
-            <h3 className="text-2xl font-semibold text-gray-700 dark:text-gray-200 mb-6">Content Highlights</h3>
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="p-6 bg-white rounded-xl border border-gray-200 dark:bg-dark-800 dark:border-dark-700">
+            <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-4">
+                Content <span className="text-gray-400 font-normal">({highlights.length})</span>
+            </h3>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
                 {highlights.map((item) => {
                     const isVideo = item.media_type === 'video';
                     // Videos get native controls and play inline (admin needs to
@@ -37,7 +39,7 @@ const ContentHighlights: React.FC<ContentHighlightsProps> = ({ highlights }) => 
                     // play-button clicks, so videos drop the anchor.
                     if (isVideo) {
                         return (
-                            <div key={item._id} className="relative block overflow-hidden rounded-lg shadow-lg bg-black">
+                            <div key={item._id} className="relative block overflow-hidden rounded-lg bg-black aspect-square">
                                 <video
                                     src={item.src}
                                     controls
@@ -49,8 +51,8 @@ const ContentHighlights: React.FC<ContentHighlightsProps> = ({ highlights }) => 
                         );
                     }
                     return (
-                        <a href={item.url} key={item._id} target="_blank" rel="noopener noreferrer" className="relative block overflow-hidden rounded-lg shadow-lg group">
-                            <img src={item?.src} alt="Content highlight" className="object-cover w-full transition-transform duration-300 transform group-hover:scale-105" />
+                        <a href={item.url} key={item._id} target="_blank" rel="noopener noreferrer" className="relative block overflow-hidden rounded-lg bg-gray-100 dark:bg-dark-700 aspect-square">
+                            <img src={item?.src} alt="Content highlight" className="object-cover w-full h-full" />
                         </a>
                     );
                 })}

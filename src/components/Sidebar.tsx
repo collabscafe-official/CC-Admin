@@ -1,4 +1,6 @@
 import React from 'react';
+import { useSelector } from 'react-redux';
+import { isTeamUser, TEAM_SCREENS } from '../utils/role';
 
 const navItems = [
   { name: 'Dashboard', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
@@ -43,6 +45,8 @@ interface SidebarProps {
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen, activeScreen, setActiveScreen }) => {
+  const user = useSelector((state: any) => state.user);
+  const items = isTeamUser(user) ? navItems.filter(i => TEAM_SCREENS.includes(i.name)) : navItems;
   const sidebarClasses = `fixed inset-y-0 left-0 z-30 w-64 px-4 py-8 overflow-y-auto bg-dark-800 border-r border-dark-700 transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0 ${isOpen ? 'translate-x-0' : '-translate-x-full'}`;
   
   return (
@@ -59,7 +63,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen, activeScreen, setA
         </div>
 
         <nav className="mt-8">
-          {navItems.map((item) => (
+          {items.map((item) => (
             <a
               key={item.name}
               href="#"

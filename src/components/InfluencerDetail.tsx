@@ -6,6 +6,7 @@ import PackagesSection from './PackagesSection';
 import ContentHighlights from './ContentHighlights';
 import FaqsSection from './FaqsSection';
 import TrustLensAdminPanel from './TrustLensAdminPanel';
+import { isTeamUser } from '../utils/role';
 import DeclineCreatorModal from './DeclineCreatorModal';
 import collabs from '../config/collabs';
 
@@ -217,7 +218,7 @@ const InfluencerDetail: React.FC = () => {
           <BackIcon />
           Influencers
         </button>
-        {!influencer.is_approved_by_admin && (
+        {!influencer.is_approved_by_admin && !isTeamUser() && (
           <div className="flex items-center gap-3">
             <button
               onClick={() => setShowDeclineModal(true)}

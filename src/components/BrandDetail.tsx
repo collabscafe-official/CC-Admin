@@ -3,6 +3,7 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { getBrands, setBrandActive } from '../store/actions/brandAction';
 import BrandAiInsightCard from './BrandAiInsightCard';
+import { isTeamUser } from '../utils/role';
 
 // ── Styles ─────────────────────────────────────────────────────────────────────
 
@@ -224,14 +225,14 @@ const BrandDetail: React.FC = () => {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 24 }}>
           <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: '#f9fafb' }}>Brand Profile</h1>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-          <button
+          {!isTeamUser() && <button
             onClick={toggleActive}
             disabled={busy}
             className="bd-back-btn"
             style={{ padding: '8px 16px', borderRadius: 8, border: `1px solid ${isActive ? 'rgba(239,68,68,0.4)' : 'rgba(16,185,129,0.4)'}`, background: isActive ? 'rgba(239,68,68,0.12)' : 'rgba(16,185,129,0.12)', color: isActive ? '#f87171' : '#10b981', fontSize: 13, fontWeight: 600, cursor: busy ? 'wait' : 'pointer', opacity: busy ? 0.6 : 1, transition: 'opacity 0.15s ease' }}
           >
             {busy ? 'Saving...' : isActive ? 'Deactivate brand' : 'Reactivate brand'}
-          </button>
+          </button>}
           <button
             onClick={handleBack}
             className="bd-back-btn"

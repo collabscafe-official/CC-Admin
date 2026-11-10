@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import DeleteConfirmationModal from './DeleteConfirmationModal';
+import { isTeamUser } from '../utils/role';
 import { getBrands, deleteBrand } from '../store/actions/brandAction';
 import { getCountries, getStates, getCities } from '../store/actions/globalActions';
 import { useDispatch, useSelector } from 'react-redux';
@@ -679,7 +680,7 @@ const Brands: React.FC = () => {
                               >
                                 <EyeIcon />
                               </button>
-                              <button
+                              {!isTeamUser() && <button
                                 onClick={() => handleOpenDeleteModal(brand)}
                                 style={{ ...iconBtnBase, color: 'rgba(255,255,255,0.3)' }}
                                 onMouseEnter={e => { const b = e.currentTarget as HTMLButtonElement; b.style.background = 'rgba(239,68,68,0.1)'; b.style.color = '#f87171'; b.style.borderColor = 'rgba(239,68,68,0.3)'; }}
@@ -687,7 +688,7 @@ const Brands: React.FC = () => {
                                 aria-label="Delete brand"
                               >
                                 <TrashIcon />
-                              </button>
+                              </button>}
                             </div>
                           </td>
                         </tr>
@@ -772,7 +773,7 @@ const Brands: React.FC = () => {
                             <EyeIcon />
                             <span>View</span>
                           </button>
-                          <button
+                          {!isTeamUser() && <button
                             onClick={() => handleOpenDeleteModal(brand)}
                             style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, justifyContent: 'center', height: 30, borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: 'rgba(255,255,255,0.3)', fontSize: 12, cursor: 'pointer', transition: 'all 0.15s ease' }}
                             onMouseEnter={e => { const b = e.currentTarget as HTMLButtonElement; b.style.background = 'rgba(239,68,68,0.1)'; b.style.color = '#f87171'; b.style.borderColor = 'rgba(239,68,68,0.3)'; }}
@@ -781,7 +782,7 @@ const Brands: React.FC = () => {
                           >
                             <TrashIcon />
                             <span>Delete</span>
-                          </button>
+                          </button>}
                         </div>
                       </div>
                     );

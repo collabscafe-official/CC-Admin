@@ -1,11 +1,13 @@
-// AdminTasks — shared task list for the admin team.
+// AdminTasks — task board for the admin team.
 //
-// Data: POST /v1/admin/tasks/{list|create|update|toggle|delete} (Backend-V2).
-// Replaces the local Node task manager at /tasks/ (port 5556). All admin
-// users see the same list; no per-user separation.
+// Data: POST /v1/admin/tasks/{list|create|update|toggle|delete|members} (Backend-V2).
+// Tasks have an assignee, optional due date + link, and visibility: 'private'
+// (super admin only, incl. the old backlog) or 'team' (everyone). Team logins
+// only ever receive team tasks from the server.
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import collabs from '../config/collabs';
+import { isTeamUser } from '../utils/role';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 type Priority = 'high' | 'medium' | 'low';
@@ -22,7 +24,24 @@ interface TaskRow {
   created_at?: string;
   updated_at?: string;
   legacy_id?: string | null;
+  assignee?: string | null;
+  assignee_name?: string | null;
+  due_date?: string | null;
+  visibility?: 'private' | 'team';
+  link?: string;
+  created_by?: string | null;
+  created_by_name?: string | null;
+  last_updated_by_name?: string | null;
 }
+
+interface Member {
+  _id: string;
+  name: string;
+  type?: string;
+}
+
+// '' = everyone, 'mine', 'unassigned', or an admin id.
+type View = string;
 
 interface Counts {
   todo: number;
@@ -53,6 +72,23 @@ function formatDateTime(s?: string | null) {
   } catch { return '—'; }
 }
 
+function initials(name?: string | null) {
+  if (!name) return '?';
+  const parts = name.trim().split(/\s+/);
+  return (parts[0][0] + (parts.length > 1 ? parts[parts.length - 1][0] : '')).toUpperCase();
+}
+
+// Due date label + whether it's overdue (before today, local time).
+function dueInfo(due?: string | null, done?: boolean) {
+  if (!due) return null;
+  const d = new Date(due);
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  return {
+    label: d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }),
+    overdue: !done && d < today,
+  };
+}
+
 // ── Component ────────────────────────────────────────────────────────────────
 const AdminTasks: React.FC = () => {
   const [tasks, setTasks] = useState<TaskRow[]>([]);
@@ -69,11 +105,28 @@ const AdminTasks: React.FC = () => {
   const [showCreate, setShowCreate] = useState(false);
   const [editing, setEditing] = useState<TaskRow | null>(null);
 
+  // Who's who: assignee picker, per-person views, own-task checks.
+  const team = isTeamUser();
+  const [members, setMembers] = useState<Member[]>([]);
+  const [me, setMe] = useState<string>('');
+  const [view, setView] = useState<View>('mine');
+
+  useEffect(() => {
+    collabs.post('/admin/tasks/members', {})
+      .then((res) => {
+        if (res?.data?.success) {
+          setMembers(res.data.data.members || []);
+          setMe(String(res.data.data.me || ''));
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   const fetchTasks = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const body: Record<string, any> = {};
+      const body: Record<string, any> = { view: view || 'all' };
       if (priorityFilter) body.priority = priorityFilter;
       if (search.trim()) body.q = search.trim();
       const res = await collabs.post('/admin/tasks/list', body, { params: { page: 1, limit: 500 } });
@@ -88,7 +141,7 @@ const AdminTasks: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [priorityFilter, search]);
+  }, [priorityFilter, search, view]);
 
   useEffect(() => { fetchTasks(); }, [fetchTasks]);
 
@@ -158,7 +211,7 @@ const AdminTasks: React.FC = () => {
         <div>
           <h1 className="text-3xl font-bold text-white">Tasks</h1>
           <p className="text-sm text-gray-400 mt-1">
-            Shared admin task list. Replaces the local task manager at localhost:5556.
+            {team ? 'Team tasks. Pick one up, or add your own.' : 'Your private tasks and everything the team is working on.'}
           </p>
         </div>
         <button
@@ -171,6 +224,28 @@ const AdminTasks: React.FC = () => {
 
       {/* Filter bar — kanban view shows all 3 status columns side by side,
           so the status tabs are gone. Priority + search still useful. */}
+      {/* Views: mine (default) / unassigned / everyone / one person */}
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        {[
+          { id: 'mine', label: 'My tasks' },
+          { id: 'unassigned', label: 'Unassigned' },
+          { id: '', label: 'Everyone' },
+          ...members.filter((m) => m._id !== me).map((m) => ({ id: m._id, label: m.name.split(' ')[0] })),
+        ].map((v) => (
+          <button
+            key={v.id || 'all'}
+            onClick={() => setView(v.id)}
+            className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors ${
+              view === v.id
+                ? 'bg-primary/20 text-white border-primary/50'
+                : 'bg-dark-800 text-gray-400 border-dark-700 hover:text-white'
+            }`}
+          >
+            {v.label}
+          </button>
+        ))}
+      </div>
+
       <div className="flex flex-wrap items-center gap-3 mb-6">
         <select
           value={priorityFilter}
@@ -250,7 +325,7 @@ const AdminTasks: React.FC = () => {
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                             </svg>
                           </button>
-                          <button
+                          {(!team || t.created_by === me) && <button
                             onClick={() => removeTask(t)}
                             className="p-1 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded transition-colors"
                             title="Delete"
@@ -259,7 +334,7 @@ const AdminTasks: React.FC = () => {
                             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3" />
                             </svg>
-                          </button>
+                          </button>}
                         </div>
                       </div>
 
@@ -272,6 +347,49 @@ const AdminTasks: React.FC = () => {
                       {t.notes && (
                         <div className="text-xs text-gray-400 mt-1.5 whitespace-pre-wrap line-clamp-3">
                           {t.notes}
+                        </div>
+                      )}
+
+                      {/* Meta: assignee, due, link, private */}
+                      <div className="flex flex-wrap items-center gap-2 mt-2">
+                        {t.assignee_name ? (
+                          <span
+                            className="inline-flex items-center justify-center w-6 h-6 text-[10px] font-bold text-white rounded-full bg-primary/70"
+                            title={`Assigned to ${t.assignee_name}`}
+                          >
+                            {initials(t.assignee_name)}
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-gray-500 italic">Unassigned</span>
+                        )}
+                        {(() => {
+                          const due = dueInfo(t.due_date, t.done);
+                          return due ? (
+                            <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${due.overdue ? 'bg-red-500/15 text-red-300' : 'bg-dark-700 text-gray-400'}`}>
+                              {due.overdue ? 'Overdue · ' : 'Due '}{due.label}
+                            </span>
+                          ) : null;
+                        })()}
+                        {t.link && (
+                          <a
+                            href={t.link}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[10px] font-semibold text-emerald-400 hover:underline"
+                          >
+                            Open link
+                          </a>
+                        )}
+                        {!team && t.visibility !== 'team' && (
+                          <span className="text-[10px] text-gray-500 border border-dark-600 px-1.5 py-0.5 rounded" title="Only you can see this task">
+                            Private
+                          </span>
+                        )}
+                      </div>
+                      {t.created_by_name && (
+                        <div className="text-[10px] text-gray-600 mt-1.5">
+                          Added by {t.created_by_name}
+                          {t.last_updated_by_name && t.last_updated_by_name !== t.created_by_name ? ` · updated by ${t.last_updated_by_name}` : ''}
                         </div>
                       )}
 
@@ -322,6 +440,9 @@ const AdminTasks: React.FC = () => {
       {(showCreate || editing) && (
         <TaskModal
           task={editing || null}
+          members={members}
+          me={me}
+          team={team}
           onClose={() => { setShowCreate(false); setEditing(null); }}
           onSaved={() => { setShowCreate(false); setEditing(null); fetchTasks(); }}
         />
@@ -333,17 +454,34 @@ const AdminTasks: React.FC = () => {
 // ── Modal ─────────────────────────────────────────────────────────────────────
 interface TaskModalProps {
   task: TaskRow | null;
+  members: Member[];
+  me: string;
+  team: boolean;
   onClose: () => void;
   onSaved: () => void;
 }
 
-const TaskModal: React.FC<TaskModalProps> = ({ task, onClose, onSaved }) => {
+const TaskModal: React.FC<TaskModalProps> = ({ task, members, me, team, onClose, onSaved }) => {
   const [title, setTitle] = useState(task?.title || '');
   const [notes, setNotes] = useState(task?.notes || '');
   const [priority, setPriority] = useState<Priority>(task?.priority || 'medium');
   const [status, setStatus] = useState<Status>(task?.status || 'todo');
+  // New tasks default to yourself.
+  const [assignee, setAssignee] = useState<string>(task ? (task.assignee || '') : me);
+  const [dueDate, setDueDate] = useState<string>(task?.due_date ? task.due_date.slice(0, 10) : '');
+  const [link, setLink] = useState(task?.link || '');
+  const [shared, setShared] = useState<boolean>(task?.visibility === 'team');
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState('');
+
+  // Giving a task to a team member always shares it with the team.
+  const assigneeIsTeam = members.find((m) => m._id === assignee)?.type === 'team';
+  const extra = {
+    assignee: assignee || null,
+    due_date: dueDate || null,
+    link: link.trim(),
+    ...(team ? {} : { visibility: shared || assigneeIsTeam ? 'team' : 'private' }),
+  };
 
   const isEdit = !!task;
 
@@ -351,6 +489,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ task, onClose, onSaved }) => {
     e.preventDefault();
     const trimmedTitle = title.trim();
     if (!trimmedTitle) { setErr('Title is required.'); return; }
+    if (link.trim() && !/^https?:\/\//i.test(link.trim())) { setErr('Link must start with http:// or https://'); return; }
 
     setSaving(true);
     setErr('');
@@ -362,6 +501,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ task, onClose, onSaved }) => {
           notes,
           priority,
           status,
+          ...extra,
         });
       } else {
         await collabs.post('/admin/tasks/create', {
@@ -369,6 +509,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ task, onClose, onSaved }) => {
           notes,
           priority,
           status,
+          ...extra,
         });
       }
       onSaved();
@@ -445,6 +586,61 @@ const TaskModal: React.FC<TaskModalProps> = ({ task, onClose, onSaved }) => {
                 </select>
               </div>
             </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-gray-400 mb-1 uppercase tracking-wider">Assigned to</label>
+                <select
+                  value={assignee}
+                  onChange={(e) => setAssignee(e.target.value)}
+                  className="w-full px-3 py-2 bg-dark-900 border border-dark-700 rounded-lg text-white text-sm focus:border-emerald-500 focus:outline-none"
+                >
+                  <option value="">Unassigned</option>
+                  {members.map((m) => (
+                    <option key={m._id} value={m._id}>{m._id === me ? `${m.name} (me)` : m.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-400 mb-1 uppercase tracking-wider">Due date</label>
+                <input
+                  type="date"
+                  value={dueDate}
+                  onChange={(e) => setDueDate(e.target.value)}
+                  className="w-full px-3 py-2 bg-dark-900 border border-dark-700 rounded-lg text-white text-sm focus:border-emerald-500 focus:outline-none"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-gray-400 mb-1 uppercase tracking-wider">Link (optional)</label>
+              <input
+                type="url"
+                value={link}
+                onChange={(e) => setLink(e.target.value)}
+                maxLength={500}
+                className="w-full px-3 py-2 bg-dark-900 border border-dark-700 rounded-lg text-white text-sm focus:border-emerald-500 focus:outline-none"
+                placeholder="Brand, creator or collab page, e.g. https://…"
+              />
+            </div>
+
+            {!team && (
+              <label className="flex items-start gap-2 text-sm text-gray-300 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={shared || assigneeIsTeam}
+                  disabled={assigneeIsTeam}
+                  onChange={(e) => setShared(e.target.checked)}
+                  className="mt-0.5"
+                />
+                <span>
+                  Share with team
+                  <span className="block text-xs text-gray-500">
+                    {assigneeIsTeam ? 'Assigned to a team member, so the team sees it.' : 'Off = only you can see this task.'}
+                  </span>
+                </span>
+              </label>
+            )}
 
             {err && (
               <div className="bg-red-500/10 border border-red-500/30 text-red-300 text-xs px-3 py-2 rounded-lg">

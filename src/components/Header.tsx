@@ -3,6 +3,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useTheme } from '../context/ThemeContext';
 import { useSelector, useDispatch } from 'react-redux';
 import { logout } from '../store/actions/authAction';
+import collabs from '../config/collabs';
+import { toast } from 'react-toastify';
 
 interface HeaderProps {
   toggleSidebar: () => void;
@@ -27,6 +29,30 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar }) => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [imageError, setImageError] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const [pwOpen, setPwOpen] = useState(false);
+  const [pw, setPw] = useState({ current: '', next: '', confirm: '' });
+  const [pwSaving, setPwSaving] = useState(false);
+
+  const savePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (pw.next.length < 8) { toast.error('New password must be at least 8 characters'); return; }
+    if (pw.next !== pw.confirm) { toast.error('New passwords do not match'); return; }
+    setPwSaving(true);
+    try {
+      const res = await collabs.post('/admin/account/change-password', { current_password: pw.current, new_password: pw.next });
+      if (res.data?.success) {
+        toast.success('Password changed');
+        setPwOpen(false);
+        setPw({ current: '', next: '', confirm: '' });
+      } else {
+        toast.error(res.data?.message || 'Could not change password');
+      }
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Could not change password');
+    } finally {
+      setPwSaving(false);
+    }
+  };
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -80,6 +106,12 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar }) => {
                 Settings
               </a>
               <button
+                onClick={() => { setPwOpen(true); setDropdownOpen(false); }}
+                className="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-dark-800"
+              >
+                Change password
+              </button>
+              <button
                 onClick={() => {
                   dispatch(logout() as any);
                   setDropdownOpen(false);
@@ -92,6 +124,30 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar }) => {
           )}
         </div>
       </div>
+      {pwOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60" onClick={() => !pwSaving && setPwOpen(false)}>
+          <form onSubmit={savePassword} onClick={e => e.stopPropagation()} className="w-full max-w-sm p-6 space-y-4 bg-white rounded-xl dark:bg-dark-800">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Change password</h2>
+            {([['current', 'Current password', 'current-password'], ['next', 'New password (8+ characters)', 'new-password'], ['confirm', 'Repeat new password', 'new-password']] as const).map(([key, label, ac]) => (
+              <label key={key} className="block">
+                <span className="block mb-1 text-xs font-medium text-gray-500 dark:text-gray-400">{label}</span>
+                <input
+                  type="password"
+                  autoComplete={ac}
+                  value={pw[key]}
+                  onChange={e => setPw(p => ({ ...p, [key]: e.target.value }))}
+                  required
+                  className="w-full px-3 py-2 text-sm border rounded-lg border-gray-300 dark:bg-dark-900 dark:border-dark-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+              </label>
+            ))}
+            <div className="flex justify-end gap-2 pt-2">
+              <button type="button" onClick={() => setPwOpen(false)} disabled={pwSaving} className="px-4 py-2 text-sm text-gray-600 rounded-lg dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-dark-700">Cancel</button>
+              <button type="submit" disabled={pwSaving} className="px-4 py-2 text-sm font-medium text-white rounded-lg bg-primary hover:opacity-90 disabled:opacity-50">{pwSaving ? 'Saving…' : 'Change password'}</button>
+            </div>
+          </form>
+        </div>
+      )}
     </header>
   );
 };

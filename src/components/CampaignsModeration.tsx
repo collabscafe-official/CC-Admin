@@ -9,6 +9,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import collabs from '../config/collabs';
 import CampaignPitchesModal from './CampaignPitchesModal';
+import { isTeamUser } from '../utils/role';
 
 interface Campaign {
     _id: string;
@@ -77,6 +78,8 @@ function formatWhen(d?: string) {
 }
 
 const CampaignsModeration: React.FC = () => {
+    // Team logins review campaigns but can't approve / reject / disable.
+    const team = isTeamUser();
     const [campaigns, setCampaigns] = useState<Campaign[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -333,7 +336,7 @@ const CampaignsModeration: React.FC = () => {
                                     )}
                                 </div>
 
-                                {!isActionable && (
+                                {!team && !isActionable && (
                                     <div className="flex flex-col gap-2 min-w-[130px]">
                                         <button
                                             onClick={() => toggleDisabled(c)}
@@ -347,7 +350,7 @@ const CampaignsModeration: React.FC = () => {
                                     </div>
                                 )}
 
-                                {isActionable && (
+                                {!team && isActionable && (
                                     <div className="flex flex-col gap-2 min-w-[130px]">
                                         <button
                                             onClick={() => approve(c._id)}

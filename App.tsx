@@ -5,6 +5,7 @@ import Header from './src/components/Header';
 import { Provider, useSelector } from 'react-redux';
 import store from './src/store/store';
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { isTeamUser, teamCanOpen } from './src/utils/role';
 
 const Dashboard = lazy(() => import('./src/components/Dashboard'));
 const Influencers = lazy(() => import('./src/components/Influencers'));
@@ -31,6 +32,7 @@ const AdminCollabDetail = lazy(() => import('./src/components/AdminCollabDetail'
 const AdminTasks = lazy(() => import('./src/components/AdminTasks'));
 const CampaignsModeration = lazy(() => import('./src/components/CampaignsModeration'));
 const LoginPage = lazy(() => import('./src/components/LoginPage'));
+const TeamDashboard = lazy(() => import('./src/components/TeamDashboard'));
 
 const App: React.FC = () => {
   return (
@@ -49,6 +51,9 @@ const Main: React.FC = () => {
   const navigate = useNavigate();
 
   const pathname = location.pathname;
+  // Team logins (view-only) only get their pages; anything else -> Dashboard.
+  const team = isTeamUser(user);
+  const blocked = !!user && team && !teamCanOpen(pathname) && pathname !== '/login' && pathname !== '/';
   const activeScreen = pathname.startsWith('/influencers')
     ? 'Influencers'
     : pathname.startsWith('/brand-activity')
@@ -148,8 +153,8 @@ const Main: React.FC = () => {
                 <Suspense fallback={<div className="flex items-center justify-center h-screen bg-dark-900">
                   <div className="w-16 h-16 border-4 border-dashed rounded-full animate-spin border-primary"></div>
                 </div>}>
-                  <Routes>
-                    <Route path="/dashboard" element={<Dashboard />} />
+                  {blocked ? <Navigate to="/dashboard" replace /> : <Routes>
+                    <Route path="/dashboard" element={team ? <TeamDashboard /> : <Dashboard />} />
                     <Route path="/influencers" element={<Influencers />} />
                     <Route path="/influencers/:id" element={<InfluencerDetail />} />
                     <Route path="/brands" element={<Brands />} />
@@ -176,7 +181,7 @@ const Main: React.FC = () => {
                     <Route path="/login" element={<Navigate to="/dashboard" replace />} />
                     <Route path="/" element={<Navigate to="/dashboard" replace />} />
                     <Route path="*" element={<Navigate to="/dashboard" replace />} />
-                  </Routes>
+                  </Routes>}
                 </Suspense>
               </div>
             </main>

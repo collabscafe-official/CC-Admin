@@ -1,7 +1,7 @@
 import React from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { getBrands } from '../store/actions/brandAction';
+import { getBrands, setBrandActive } from '../store/actions/brandAction';
 import BrandAiInsightCard from './BrandAiInsightCard';
 
 // ── Styles ─────────────────────────────────────────────────────────────────────
@@ -169,6 +169,29 @@ const BrandDetail: React.FC = () => {
 
   const brand = location.state?.brand || (brands?.profiles || brands?.brands || [])?.find((b: any) => b._id === id);
 
+  // Local copy so the button + pill flip without refetching the list.
+  const [isActive, setIsActive] = React.useState<boolean>(!!brand?.is_active);
+  const [busy, setBusy]         = React.useState(false);
+
+  const toggleActive = async () => {
+    const deactivating = isActive;
+    let reason = '';
+    if (deactivating) {
+      const r = prompt(`Deactivate "${brand.brand_name}"?\n\nThey are logged out everywhere, cannot sign in or message creators, and their pending requests are withdrawn.\n\nInternal note (optional, brand does not see this):`, '');
+      if (r === null) return;
+      reason = r;
+    } else if (!confirm(`Reactivate "${brand.brand_name}"? They can sign in and message creators again.`)) {
+      return;
+    }
+    setBusy(true);
+    const ok = await setBrandActive(brand._id, !deactivating, reason);
+    if (ok) {
+      setIsActive(!deactivating);
+      brand.is_active = !deactivating;
+    }
+    setBusy(false);
+  };
+
   const savedPage        = location.state?.currentPage || 1;
   const savedItemsPerPage = location.state?.itemsPerPage || 10;
 
@@ -200,6 +223,15 @@ const BrandDetail: React.FC = () => {
         {/* Page header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 24 }}>
           <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: '#f9fafb' }}>Brand Profile</h1>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          <button
+            onClick={toggleActive}
+            disabled={busy}
+            className="bd-back-btn"
+            style={{ padding: '8px 16px', borderRadius: 8, border: `1px solid ${isActive ? 'rgba(239,68,68,0.4)' : 'rgba(16,185,129,0.4)'}`, background: isActive ? 'rgba(239,68,68,0.12)' : 'rgba(16,185,129,0.12)', color: isActive ? '#f87171' : '#10b981', fontSize: 13, fontWeight: 600, cursor: busy ? 'wait' : 'pointer', opacity: busy ? 0.6 : 1, transition: 'opacity 0.15s ease' }}
+          >
+            {busy ? 'Saving...' : isActive ? 'Deactivate brand' : 'Reactivate brand'}
+          </button>
           <button
             onClick={handleBack}
             className="bd-back-btn"
@@ -208,6 +240,7 @@ const BrandDetail: React.FC = () => {
             <BackIcon />
             Back to Brands
           </button>
+          </div>
         </div>
 
         {/* ── HERO CARD ── */}
@@ -248,7 +281,7 @@ const BrandDetail: React.FC = () => {
 
               {/* Status pills */}
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 14 }}>
-                <StatusPill on={!!brand.is_active}            labelOn="Active"           labelOff="Inactive" />
+                <StatusPill on={isActive}                     labelOn="Active"           labelOff="Inactive" />
                 <StatusPill on={!!brand.is_email_verified}    labelOn="Email Verified"   labelOff="Email Unverified" />
                 <StatusPill on={!!brand.is_profile_completed} labelOn="Profile Complete" labelOff="Profile Incomplete" />
                 <StatusPill on={!!brand.is_approved_by_admin} labelOn="Admin Approved"   labelOff="Not Approved" />

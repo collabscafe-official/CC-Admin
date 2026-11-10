@@ -40,6 +40,22 @@ export const getBrands = (limit = 10, page = 1, is_active = '', is_email_verifie
     }
 }
 
+// Deactivate / reactivate a brand. Returns true on success.
+export const setBrandActive = async (brandId, active, reason = '') => {
+    try {
+        const response = await collabs.post('/admin/brands/set-active', { brand_id: brandId, active, reason });
+        if (response.data?.success) {
+            toast.success(response.data.message);
+            return true;
+        }
+        toast.error(response.data?.message || 'Could not update brand');
+        return false;
+    } catch (error) {
+        toast.error(error.response?.data?.message || 'Could not update brand');
+        return false;
+    }
+}
+
 export const deleteBrand = (id, callback) => {
     return async (dispatch) => {
         try {

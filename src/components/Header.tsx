@@ -35,7 +35,11 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar }) => {
 
   const savePassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (pw.next.length < 8) { toast.error('New password must be at least 8 characters'); return; }
+    // Same rule as the login form, or the new password could never sign in.
+    if (!/^(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z])(?=.*[\W_])(?!.* ).{8,50}$/.test(pw.next)) {
+      toast.error('New password needs 8 to 50 characters with an uppercase letter, a lowercase letter, a number and a symbol, and no spaces');
+      return;
+    }
     if (pw.next !== pw.confirm) { toast.error('New passwords do not match'); return; }
     setPwSaving(true);
     try {
@@ -128,7 +132,7 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar }) => {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60" onClick={() => !pwSaving && setPwOpen(false)}>
           <form onSubmit={savePassword} onClick={e => e.stopPropagation()} className="w-full max-w-sm p-6 space-y-4 bg-white rounded-xl dark:bg-dark-800">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Change password</h2>
-            {([['current', 'Current password', 'current-password'], ['next', 'New password (8+ characters)', 'new-password'], ['confirm', 'Repeat new password', 'new-password']] as const).map(([key, label, ac]) => (
+            {([['current', 'Current password', 'current-password'], ['next', 'New password (8+ chars: A-Z, a-z, 0-9, symbol)', 'new-password'], ['confirm', 'Repeat new password', 'new-password']] as const).map(([key, label, ac]) => (
               <label key={key} className="block">
                 <span className="block mb-1 text-xs font-medium text-gray-500 dark:text-gray-400">{label}</span>
                 <input

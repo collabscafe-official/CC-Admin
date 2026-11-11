@@ -48,7 +48,9 @@ export const getBrandById = async (id) => {
     try {
         const res = await collabs.get(`/admin/brands/list?id=${encodeURIComponent(id)}&limit=1&page=1`);
         const d = res.data?.data;
-        return (d?.profiles || d?.brands || [])[0] || null;
+        // Only accept the exact brand (an older server ignores ?id and returns the first brand).
+        const b = (d?.profiles || d?.brands || [])[0];
+        return b && String(b._id) === String(id) ? b : null;
     } catch (e) {
         return null;
     }

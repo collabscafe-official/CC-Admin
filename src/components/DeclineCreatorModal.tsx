@@ -9,6 +9,8 @@ const DECLINE_REASONS: Array<{ code: string; label: string }> = [
     { code: 'low_followers',            label: 'Low followers' },
     { code: 'socials_not_found',        label: 'Socials not found / invalid' },
     { code: 'blurry_pictures',          label: 'Blurry profile / portfolio pictures' },
+    { code: 'profile_photo_low_res',    label: 'Profile photo low resolution' },
+    { code: 'profile_photo_not_self',   label: 'Profile photo is not of the creator' },
     { code: 'incomplete_portfolio',     label: 'Incomplete portfolio' },
     { code: 'incomplete_bio',           label: 'Incomplete bio' },
     { code: 'inappropriate_content',    label: 'Inappropriate content' },

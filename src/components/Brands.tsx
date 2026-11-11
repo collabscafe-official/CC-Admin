@@ -281,6 +281,7 @@ const Brands: React.FC = () => {
   const debouncedCountry = useDebounce(filters.country, 500);
   const debouncedState   = useDebounce(filters.state,   500);
   const debouncedCity    = useDebounce(filters.city,    500);
+  const debouncedSearch  = useDebounce(searchQuery,     400);
 
   const activeFilterCount = useMemo(() =>
     Object.values(filters).filter(v => v !== '').length,
@@ -364,12 +365,13 @@ const Brands: React.FC = () => {
       '', '', // is_approved_by_admin, is_featured — not sent
       debouncedCountry, debouncedState, debouncedCity,
       '', // gender — not sent
-      (_success: boolean) => { setIsLoading(false); }
+      (_success: boolean) => { setIsLoading(false); },
+      debouncedSearch,
     ) as unknown as any);
   }, [
     dispatch, itemsPerPage, currentPage,
     filters.is_active, filters.is_email_verified, filters.is_profile_completed,
-    debouncedCountry, debouncedState, debouncedCity,
+    debouncedCountry, debouncedState, debouncedCity, debouncedSearch,
   ]);
 
   useEffect(() => {
@@ -382,12 +384,9 @@ const Brands: React.FC = () => {
 
   const filteredBrands = useMemo(() => {
     if (!Array.isArray(brandsList)) return [];
-    if (!searchQuery) return brandsList;
-    const q = searchQuery.toLowerCase();
-    return brandsList.filter((b: any) =>
-      b.brand_name?.toLowerCase().includes(q) || b.name?.toLowerCase().includes(q)
-    );
-  }, [brandsList, searchQuery]);
+    // Search is applied on the server now (all brands, not just this page).
+    return brandsList;
+  }, [brandsList]);
 
   const totalCount = brands?.pagination?.total_count ?? 0;
   const totalPages = totalCount ? Math.ceil(totalCount / itemsPerPage) : 1;

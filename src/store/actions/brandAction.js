@@ -2,7 +2,7 @@ import collabs from "../../config/collabs";
 import { GET_BRANDS } from "../types";
 import { toast } from "react-toastify";
 
-export const getBrands = (limit = 10, page = 1, is_active = '', is_email_verified = '', is_profile_completed = '', is_approved_by_admin = '', is_featured = '', country = '', state = '', city = '', gender = '', callback) => {
+export const getBrands = (limit = 10, page = 1, is_active = '', is_email_verified = '', is_profile_completed = '', is_approved_by_admin = '', is_featured = '', country = '', state = '', city = '', gender = '', callback, search = '') => {
     return async (dispatch) => {
         try {
             // Build query parameters - only include non-empty values
@@ -19,6 +19,8 @@ export const getBrands = (limit = 10, page = 1, is_active = '', is_email_verifie
             if (state !== '') params.append('state', state);
             if (city !== '') params.append('city', city);
             if (gender !== '') params.append('gender', gender);
+            // Server-side search across all brands (name, brand name, email).
+            if (search && String(search).trim()) params.append('search', String(search).trim());
             
             const queryString = params.toString();
             const response = await collabs.get(`/admin/brands/list?${queryString}`);
@@ -39,6 +41,18 @@ export const getBrands = (limit = 10, page = 1, is_active = '', is_email_verifie
         }
     }
 }
+
+// One brand by id (brand page opened from somewhere other than the Brands list,
+// e.g. the checkout list). Returns the brand or null.
+export const getBrandById = async (id) => {
+    try {
+        const res = await collabs.get(`/admin/brands/list?id=${encodeURIComponent(id)}&limit=1&page=1`);
+        const d = res.data?.data;
+        return (d?.profiles || d?.brands || [])[0] || null;
+    } catch (e) {
+        return null;
+    }
+};
 
 // Deactivate / reactivate a brand. Returns true on success.
 export const setBrandActive = async (brandId, active, reason = '') => {

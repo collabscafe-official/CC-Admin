@@ -1,7 +1,7 @@
 import React from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { getBrands, setBrandActive } from '../store/actions/brandAction';
+import { getBrands, setBrandActive, getBrandById } from '../store/actions/brandAction';
 import BrandAiInsightCard from './BrandAiInsightCard';
 import { isTeamUser } from '../utils/role';
 
@@ -168,10 +168,22 @@ const BrandDetail: React.FC = () => {
   const dispatch  = useDispatch();
   const brands    = useSelector((state: any) => state.brands);
 
-  const brand = location.state?.brand || (brands?.profiles || brands?.brands || [])?.find((b: any) => b._id === id);
+  const known = location.state?.brand || (brands?.profiles || brands?.brands || [])?.find((b: any) => b._id === id);
+  // Opened from outside the Brands list (e.g. checkout): load the brand by id.
+  const [fetched, setFetched] = React.useState<any>(null);
+  const [loadingBrand, setLoadingBrand] = React.useState<boolean>(!known);
+  React.useEffect(() => {
+    if (known || !id) { setLoadingBrand(false); return; }
+    let alive = true;
+    setLoadingBrand(true);
+    getBrandById(id).then((b: any) => { if (alive) { setFetched(b); setLoadingBrand(false); } });
+    return () => { alive = false; };
+  }, [id, known]);
+  const brand = known || fetched;
 
   // Local copy so the button + pill flip without refetching the list.
   const [isActive, setIsActive] = React.useState<boolean>(!!brand?.is_active);
+  React.useEffect(() => { if (brand) setIsActive(!!brand.is_active); }, [brand?._id]);
   const [busy, setBusy]         = React.useState(false);
 
   const toggleActive = async () => {
@@ -201,6 +213,14 @@ const BrandDetail: React.FC = () => {
     dispatch(getBrands(savedItemsPerPage, savedPage, '', '', '', '', '', '', '', '', () => {}) as unknown as any);
     navigate('/brands', { state: { currentPage: savedPage, itemsPerPage: savedItemsPerPage } });
   };
+
+  if (!brand && loadingBrand) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 240, color: '#6b7280' }}>
+        Loading brand...
+      </div>
+    );
+  }
 
   if (!brand) {
     return (

@@ -484,7 +484,7 @@ const Brands: React.FC = () => {
             </span>
             <input
               type="text"
-              placeholder="Search by brand or name…"
+              placeholder="Search brand, name, email or phone…"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               className="br-input"

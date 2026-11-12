@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useLocation, useParams, useNavigate } from 'react-router-dom';
-import { approveCreator, declineCreator } from '../store/actions/creatorAction';
+import { approveCreator, declineCreator, setCreatorActive } from '../store/actions/creatorAction';
 import PackagesSection from './PackagesSection';
 import ContentHighlights from './ContentHighlights';
 import FaqsSection from './FaqsSection';
@@ -140,6 +140,32 @@ const InfluencerDetail: React.FC = () => {
     return () => { alive = false; };
   }, [id, known]);
   const influencer = known || fetched;
+
+  // Local copy so the button + pill flip without refetching the list.
+  const [isActive, setIsActive] = useState<boolean>(influencer?.is_active !== false);
+  useEffect(() => { if (influencer) setIsActive(influencer.is_active !== false); }, [influencer?._id]);
+  const [togglingActive, setTogglingActive] = useState(false);
+
+  const toggleActive = async () => {
+    if (!influencer?._id) return;
+    const deactivating = isActive;
+    let reason = '';
+    if (deactivating) {
+      const r = prompt(`Deactivate ${influencer.name || 'this creator'}?\n\nTheir profile is hidden from brands, they are logged out and cannot sign in or chat, and their open (unpaid) offers are withdrawn. Paid orders are not touched.\n\nInternal note (optional, creator does not see this):`, '');
+      if (r === null) return;
+      reason = r;
+    } else if (!confirm(`Reactivate ${influencer.name || 'this creator'}? Their profile shows to brands again and they can sign in.`)) {
+      return;
+    }
+    setTogglingActive(true);
+    const ok = await setCreatorActive(influencer._id, !deactivating, reason);
+    if (ok) {
+      setIsActive(!deactivating);
+      influencer.is_active = !deactivating;
+    }
+    setTogglingActive(false);
+  };
+
   const savedPage = location.state?.currentPage || 1;
   const savedItemsPerPage = location.state?.itemsPerPage || 10;
 
@@ -246,6 +272,17 @@ const InfluencerDetail: React.FC = () => {
             </button>
           </div>
         )}
+        {influencer.is_approved_by_admin && !isTeamUser() && (
+          <button
+            onClick={toggleActive}
+            disabled={togglingActive}
+            className={`px-4 py-2 text-sm font-medium rounded-lg border disabled:opacity-50 disabled:cursor-wait ${isActive
+              ? 'text-red-600 bg-white border-red-200 hover:bg-red-50 dark:bg-dark-800 dark:border-red-500/40 dark:text-red-400 dark:hover:bg-red-500/10'
+              : 'text-green-700 bg-white border-green-200 hover:bg-green-50 dark:bg-dark-800 dark:border-green-500/40 dark:text-green-400 dark:hover:bg-green-500/10'}`}
+          >
+            {togglingActive ? 'Saving...' : isActive ? 'Deactivate creator' : 'Reactivate creator'}
+          </button>
+        )}
       </div>
 
       <div className={card}>
@@ -264,6 +301,11 @@ const InfluencerDetail: React.FC = () => {
                 }`}>
                 {influencer?.is_approved_by_admin ? 'Approved' : 'Pending review'}
               </span>
+              {!isActive && (
+                <span className="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300">
+                  Deactivated
+                </span>
+              )}
             </div>
             <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
               {[influencer?.username && `@${influencer.username}`, place, joined && `Joined ${joined}`].filter(Boolean).join(' · ')}

@@ -101,3 +101,18 @@ export const deleteCreator = (id, callback) => {
         }
     }
 }
+// Deactivate / reactivate a creator. Returns true on success.
+export const setCreatorActive = async (id, active, reason = '') => {
+    try {
+        const response = await collabs.post('/admin/influencers/set-active', { influencer_id: id, active, reason });
+        if (response.data?.success) {
+            toast.success(response.data.message, { autoClose: 8000 });
+            return true;
+        }
+        toast.error(response.data?.message || 'Could not update creator');
+        return false;
+    } catch (error) {
+        toast.error(error?.response?.data?.message || 'Could not update creator');
+        return false;
+    }
+}

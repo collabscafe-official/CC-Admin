@@ -157,8 +157,13 @@ const InfluencerDetail: React.FC = () => {
     } else if (!confirm(`Reactivate ${influencer.name || 'this creator'}? Their profile shows to brands again and they can sign in.`)) {
       return;
     }
+    // OK = email the creator ("you're welcome back anytime"). Cancel for
+    // blocks (e.g. 3 strikes) where that message would be wrong.
+    const notify = deactivating
+      ? confirm('Email the creator that their profile is deactivated and they can come back anytime?\n\nOK = send email, Cancel = deactivate without email.')
+      : false;
     setTogglingActive(true);
-    const ok = await setCreatorActive(influencer._id, !deactivating, reason);
+    const ok = await setCreatorActive(influencer._id, !deactivating, reason, notify);
     if (ok) {
       setIsActive(!deactivating);
       influencer.is_active = !deactivating;

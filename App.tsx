@@ -23,6 +23,7 @@ const BrandActivity = lazy(() => import('./src/components/BrandActivity'));
 const BrandActivityDetail = lazy(() => import('./src/components/BrandActivityDetail'));
 const BrandActivitySearches = lazy(() => import('./src/components/BrandActivitySearches'));
 const BrandActivityRankingQuality = lazy(() => import('./src/components/BrandActivityRankingQuality'));
+const Leads = lazy(() => import('./src/components/Leads'));
 const AdminOrders = lazy(() => import('./src/components/AdminOrders'));
 const AdminOrderDetail = lazy(() => import('./src/components/AdminOrderDetail'));
 const AdminDisputes = lazy(() => import('./src/components/AdminDisputes'));
@@ -82,6 +83,8 @@ const Main: React.FC = () => {
                           ? 'Tasks'
                           : pathname.startsWith('/campaigns')
                             ? 'Campaigns'
+                            : pathname.startsWith('/leads')
+                            ? 'Leads'
                             : 'Dashboard';
 
   const setActiveScreen = (screen: string) => {
@@ -127,6 +130,9 @@ const Main: React.FC = () => {
         break;
       case 'Campaigns':
         navigate('/campaigns');
+        break;
+      case 'Leads':
+        navigate('/leads');
         break;
       case 'Dashboard':
       default:
@@ -178,6 +184,7 @@ const Main: React.FC = () => {
                     <Route path="/collabs/:chatId" element={<AdminCollabDetail />} />
                     <Route path="/tasks" element={<AdminTasks />} />
                     <Route path="/campaigns" element={<CampaignsModeration />} />
+                    <Route path="/leads" element={<Leads />} />
                     <Route path="/login" element={<Navigate to="/dashboard" replace />} />
                     <Route path="/" element={<Navigate to="/dashboard" replace />} />
                     <Route path="*" element={<Navigate to="/dashboard" replace />} />

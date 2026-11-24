@@ -1,4 +1,4 @@
-// Dashboard for team logins (sales): brand signups + open tasks only.
+// Dashboard for team logins: brand + creator signups and open tasks only.
 // Backed by GET /admin/dashboard/team-summary.
 
 import React, { useEffect, useState } from 'react';
@@ -7,6 +7,7 @@ import collabs from '../config/collabs';
 
 interface Summary {
   brands: { total: number; today: number; last_7_days: number };
+  creators?: { total: number; today: number; last_7_days: number };
   tasks: { open: number; mine_open: number; mine_overdue: number };
 }
 
@@ -45,6 +46,17 @@ const TeamDashboard: React.FC = () => {
           <Stat label="All time" value={data.brands.total} onClick={() => navigate('/brands')} />
         </div>
       </section>
+
+      {data.creators && (
+        <section className="space-y-3">
+          <h2 className="text-sm font-semibold text-gray-500 uppercase dark:text-gray-400">Creator signups</h2>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <Stat label="Today" value={data.creators.today} onClick={() => navigate('/influencers')} />
+            <Stat label="Last 7 days" value={data.creators.last_7_days} onClick={() => navigate('/influencers')} />
+            <Stat label="All time" value={data.creators.total.toLocaleString()} onClick={() => navigate('/influencers')} />
+          </div>
+        </section>
+      )}
 
       <section className="space-y-3">
         <h2 className="text-sm font-semibold text-gray-500 uppercase dark:text-gray-400">Tasks</h2>

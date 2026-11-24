@@ -16,6 +16,19 @@ export function isTeamUser(user?: any): boolean {
   return u?.type === 'team';
 }
 
+// Screens a team login may be given on top of the default set (per account,
+// via the `screens` list on the admin; see Backend-V2 create-team-admin.js).
+const TEAM_OPTIONAL_SCREENS = ['Top Creators'];
+
+// The sidebar items this team login sees: its own `screens` list when set
+// (limited to screens a team login is allowed), otherwise the default set.
+export function teamScreensFor(user?: any): string[] {
+  const own: string[] = Array.isArray(user?.screens) ? user.screens : [];
+  if (!own.length) return TEAM_SCREENS;
+  const allowed = [...TEAM_SCREENS, ...TEAM_OPTIONAL_SCREENS];
+  return own.filter(s => allowed.includes(s));
+}
+
 export function teamCanOpen(pathname: string): boolean {
   return TEAM_PATHS.some(p => pathname === p || pathname.startsWith(p + '/'));
 }
